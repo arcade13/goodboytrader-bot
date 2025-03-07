@@ -8,13 +8,12 @@ import json
 import asyncio
 import telegram
 import time
-import okx.Market as Market
-import okx.Trade as Trade
-import okx.Account as Account
+import okx.MarketDataAPI as MarketData
+import okx.TradeAPI as Trade
+import okx.AccountAPI as Account
 
 # Debug: Inspect OKX package
 print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
-# Force redeploy to clear Render cache - 2025-03-07
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -306,7 +305,7 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-market_api = Market.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+market_api = MarketData.MarketDataAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
