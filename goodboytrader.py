@@ -6,7 +6,7 @@ import numpy as np
 import json
 import os
 from dotenv import load_dotenv
-import okx.MarketData as MarketData
+from okx import MarketData
 import okx.Trade as Trade
 import okx.Account as Account
 import asyncio
