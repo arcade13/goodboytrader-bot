@@ -6,7 +6,6 @@ import numpy as np
 import json
 import os
 import time
-from okx import Client
 from okx.api import Market as MarketData
 from okx.api import Trade as Trade
 from okx.api import Account as Account
@@ -305,18 +304,24 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-# Initialize client with correct domain and credentials
-client = Client(
-    api_key=API_KEY,
-    api_secret_key=SECRET_KEY,
+market_api = MarketData(
+    key=API_KEY,
+    secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    domain='https://www.okx.com'  # Explicitly set the correct domain
+    flag='0'  # '0' for live trading, '1' for demo
 )
-
-# Use client for all APIs
-market_api = MarketData(client=client)
-trade_api = Trade(client=client)
-account_api = Account(client=client)
+trade_api = Trade(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0'
+)
+account_api = Account(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0'
+)
 
 # Set position mode and leverage
 account_api.set_position_mode(posMode="long_short_mode")
