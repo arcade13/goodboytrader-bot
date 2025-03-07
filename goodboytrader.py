@@ -20,14 +20,14 @@ print(f"Installed modules: {installed_modules}")
 try:
     import okx
 except ModuleNotFoundError:
-    print("⚠️ OKX module not found. Attempting to install it...")
+    print("⚠️ OKX module not found. Installing...")
     subprocess.run([sys.executable, "-m", "pip", "install", "okx"])
     import okx  # Try importing again
 
 # ✅ CHECK IF OKX API IS ACCESSIBLE
 try:
     from okx import api
-    print("✅ OKX API found:", dir(api))  # Print available API components
+    print("✅ OKX API found:", dir(api))
 
     # ✅ Initialize API Instances
     MarketData = api.Market()
@@ -35,22 +35,34 @@ try:
     Account = api.Account()
 except Exception as e:
     print("⚠️ ERROR: Failed to import OKX API:", str(e))
-    exit(1)  # Prevents deployment failure
+    exit(1)
 
 # ✅ SECURITY: Load Credentials
-API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
-SECRET_KEY = os.getenv('OKX_SECRET_KEY', 'your_okx_secret_key')
-PASSPHRASE = os.getenv('OKX_PASSPHRASE', 'your_okx_passphrase')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
-CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
+API_KEY = os.getenv('OKX_API_KEY')
+SECRET_KEY = os.getenv('OKX_SECRET_KEY')
+PASSPHRASE = os.getenv('OKX_PASSPHRASE')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+CHAT_ID = os.getenv('CHAT_ID')
+
+# ✅ DEBUG: Print environment variables (Remove this after testing)
+print(f"OKX_API_KEY: {'✔' if API_KEY else '❌ MISSING'}")
+print(f"OKX_SECRET_KEY: {'✔' if SECRET_KEY else '❌ MISSING'}")
+print(f"OKX_PASSPHRASE: {'✔' if PASSPHRASE else '❌ MISSING'}")
+print(f"TELEGRAM_TOKEN: {'✔' if TELEGRAM_TOKEN else '❌ MISSING'}")
+print(f"CHAT_ID: {CHAT_ID if CHAT_ID and CHAT_ID.isdigit() else '❌ INVALID CHAT ID'}")
 
 # ✅ VALIDATE CREDENTIALS
-required_vars = {'OKX_API_KEY': API_KEY, 'OKX_SECRET_KEY': SECRET_KEY, 'OKX_PASSPHRASE': PASSPHRASE, 
-                'TELEGRAM_TOKEN': TELEGRAM_TOKEN, 'CHAT_ID': CHAT_ID}
-for var_name, var_value in required_vars.items():
-    if not var_value or var_value.startswith('your_'):
-        print(f"⚠️ ERROR: {var_name} is not set. Please check your environment variables.")
-        exit(1)
+missing_vars = [var for var, value in {
+    'OKX_API_KEY': API_KEY, 
+    'OKX_SECRET_KEY': SECRET_KEY, 
+    'OKX_PASSPHRASE': PASSPHRASE, 
+    'TELEGRAM_TOKEN': TELEGRAM_TOKEN, 
+    'CHAT_ID': CHAT_ID
+}.items() if not value]
+
+if missing_vars:
+    print(f"⚠️ ERROR: Missing environment variables: {', '.join(missing_vars)}")
+    exit(1)
 
 # ✅ Initialize Telegram Bot
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
