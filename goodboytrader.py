@@ -303,7 +303,7 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-market_api = MarketData(use_server_time=False, flag='0')
+market_api = MarketData()
 trade_api = Trade(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api = Account(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
