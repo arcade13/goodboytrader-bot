@@ -1,13 +1,16 @@
 import os
-import okx.api
-
-# Debug: Inspect OKX api submodule
-print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
-print("OKX.api contents:", dir(okx.api))
-
-# Exit after debug
-import sys
-sys.exit(0)
+import pandas as pd
+import ta
+from datetime import datetime, timedelta
+import logging
+import numpy as np
+import json
+import asyncio
+import telegram
+import time
+import okx.api.Market as MarketData  # Corrected import
+import okx.api.Trade as Trade        # Corrected import
+import okx.api.Account as Account    # Corrected import
 
 # Debug: Confirm OKX package structure
 print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
@@ -302,7 +305,7 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-market_api = MarketData.MarketDataAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+market_api = MarketData.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
