@@ -1,1 +1,5 @@
-okx==2.1.1  # Force full install
+okx==2.1.1
+pandas
+numpy
+ta
+telegram

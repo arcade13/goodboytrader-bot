@@ -1,16 +1,14 @@
 import os
-print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
 import pandas as pd
 import ta
 from datetime import datetime, timedelta
 import logging
 import numpy as np
 import json
-import os
-from okx.api import MarketAPI, TradeAPI, AccountAPI
 import asyncio
-import telegram  # Back to Telegram
+import telegram
 import time
+from okx.api import MarketAPI, TradeAPI, AccountAPI
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -58,15 +56,15 @@ adx_15m_threshold = 15
 
 # --- Detailed Startup Message ---
 startup_message = (
-    f" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌\n"
-    f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    f"💰 Trade Size: {base_trade_size_usdt} USDT @ {leverage}x Leverage\n"
-    f"🎯 Symbol: {symbol}\n"
-    f"📊 Strategy: EMA {ema_short_period}/{ema_mid_period}/{ema_long_period}, RSI {rsi_long_threshold}/{rsi_short_threshold}, "
+    f"🚀 OKX Trading Bot Initialized - GoodBoyTrader 🚀\n"
+    f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    f"Trade Size: {base_trade_size_usdt} USDT @ {leverage}x Leverage\n"
+    f"Symbol: {symbol}\n"
+    f"Strategy: EMA {ema_short_period}/{ema_mid_period}/{ema_long_period}, RSI {rsi_long_threshold}/{rsi_short_threshold}, "
     f"ADX 4H >= {adx_4h_threshold}, ADX 15M >= {adx_15m_threshold}\n"
-    f"🛡️ Risk: {stop_loss_pct*100:.1f}% SL, {trailing_stop_factor}×ATR Trailing Stop\n"
-    f"💸 Costs: {FEES*100:.3f}% Fees, {SLIPPAGE*100:.1f}% Slippage\n"
-    f"📬 Notifications: Telegram to Chat ID {CHAT_ID}"
+    f"Risk: {stop_loss_pct*100:.1f}% SL, {trailing_stop_factor}×ATR Trailing Stop\n"
+    f"Costs: {FEES*100:.3f}% Fees, {SLIPPAGE*100:.1f}% Slippage\n"
+    f"Notifications: Telegram to Chat ID {CHAT_ID}"
 )
 print(startup_message)
 logging.info(startup_message)
@@ -123,7 +121,7 @@ class TradeTracker:
             self.wins += 1 if pnl > 0 else 0
             self.losses += 1 if pnl < 0 else 0
         logging.info(f"Trade {'partial' if partial else 'completed'}. PnL: {pnl:.2f} USDT, Total: {self.total_pnl:.2f}")
-        print(f" 💸 {'Partial' if partial else 'Trade'} PnL: {pnl:.2f} USDT 💰 Total: {self.total_pnl:.2f} USDT 🎲 Wins: {self.wins} 🏆 Losses: {self.losses}")
+        print(f"💸 {'Partial' if partial else 'Trade'} PnL: {pnl:.2f} USDT 💰 Total: {self.total_pnl:.2f} USDT 🎲 Wins: {self.wins} 🏆 Losses: {self.losses}")
 
 tracker = TradeTracker()
 
@@ -215,7 +213,7 @@ def place_order(side, price, size_usdt):
     )
     if response['code'] == '0':
         size_sol = size_contracts * lot_size
-        alert = f"🎉 GoodBoyTrader jumps in! {side.capitalize()} at {price:.2f} 🚀 Size: {size_sol:.4f} SOL 🌞 Let’s ride the wave!"
+        alert = f"🐾 GoodBoyTrader jumps in! {side.capitalize()} at {price:.2f}  Size: {size_sol:.4f} SOL  Let’s ride the wave!"
         asyncio.run(send_telegram_alert(alert))
         return response['data'][0]['ordId'], size_sol
     else:
@@ -230,7 +228,7 @@ def close_order(side, price, size_sol, exit_type=''):
         ordType='market', sz=str(size_contracts)
     )
     if response['code'] == '0':
-        print(f" 🏁 Closed {size_sol:.4f} SOL at {price:.2f} ({exit_type})")
+        print(f"✅ Closed {size_sol:.4f} SOL at {price:.2f} ({exit_type})")
         return True
     else:
         logging.error(f"Close order failed: {response.get('msg', 'Unknown error')}")
@@ -240,7 +238,7 @@ def close_order(side, price, size_sol, exit_type=''):
 def monitor_position(position, entry_price, trade):
     global position_state, entry_atr
     size_sol = trade['size_sol']
-    
+
     df_15m = fetch_recent_data(timeframe='15m', limit='100')
     if df_15m.empty:
         return
@@ -252,7 +250,7 @@ def monitor_position(position, entry_price, trade):
     tp2_price = entry_price + (entry_atr * atr_multiplier) if position == 'long' else entry_price - (entry_atr * atr_multiplier)
     sl_adjusted = False
 
-    print(f" 📉 SL: {stop_loss:.2f}, TP1: {tp1_price:.2f}, TP2: {tp2_price:.2f}, TSL Factor: {trailing_stop_factor} × ATR")
+    print(f"📉 SL: {stop_loss:.2f}, TP1: {tp1_price:.2f}, TP2: {tp2_price:.2f}, TSL Factor: {trailing_stop_factor} × ATR")
 
     while position_state == position:
         current_price = get_current_price()
@@ -267,7 +265,7 @@ def monitor_position(position, entry_price, trade):
         if not sl_adjusted and ((position == 'long' and current_price >= tp1_price) or (position == 'short' and current_price <= tp1_price)):
             sl_adjusted = True
             stop_loss = entry_price
-            print(f" 🎯 {position.capitalize()} hit TP1 at {tp1_price:.2f}, SL moved to breakeven ({entry_price:.2f})")
+            print(f"🎯 {position.capitalize()} hit TP1 at {tp1_price:.2f}, SL moved to breakeven ({entry_price:.2f})")
             alert = f"🏆 Woo-hoo! {position.capitalize()} hit TP1 at {tp1_price:.2f} 🎯 SL now at breakeven {entry_price:.2f} 😎 Safe zone activated!"
             asyncio.run(send_telegram_alert(alert))
 
@@ -302,20 +300,11 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-# --- Initialization ---
 market_api = MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 trade_api = TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api = AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-
-# --- Set trading parameters ---
-instId = "BTC-USDT-SWAP"  # Example instrument ID
-leverage = 5  # Example leverage
-
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
-
-print("init settings complete")  # Add this to match your logs
-# Add your trading logic here...
 
 # --- Main Loop (Live Trading) ---
 position_state, trade = load_trade_state()
@@ -324,7 +313,7 @@ while True:
         df_4h = fetch_recent_data(timeframe='4H', limit='400')
         df_15m = fetch_recent_data(timeframe='15m', limit='100')
         if df_4h.empty or len(df_4h) < ema_long_period or df_15m.empty or len(df_15m) < ema_long_period:
-            print("Insufficient data, waiting...")
+            print("⚠️ Insufficient data, waiting...")
             time.sleep(60)
             continue
 
@@ -351,4 +340,3 @@ while True:
         alert = f"🚨 Uh-oh! GoodBoyTrader hit a snag: {str(e)} 😵 Fixing it soon—stay tuned!"
         asyncio.run(send_telegram_alert(alert))
         time.sleep(60)
-
