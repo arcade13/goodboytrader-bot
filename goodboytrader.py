@@ -6,7 +6,7 @@ import numpy as np
 import json
 import os
 from dotenv import load_dotenv
-from okx.v5 import MarketAPI
+from okx import MarketAPI
 market_api = MarketAPI(flag='0')
 import okx.Trade as Trade
 import okx.Account as Account
