@@ -14,6 +14,7 @@ import okx.Account as Account
 
 # Debug: Inspect OKX package
 print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
+# Force redeploy to clear Render cache - 2025-03-07
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
