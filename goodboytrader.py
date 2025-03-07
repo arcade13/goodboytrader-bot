@@ -1,8 +1,8 @@
 import sys
 import subprocess
+import os
 import pkgutil
 import logging
-import os
 import time
 import asyncio
 import pandas as pd
@@ -10,26 +10,28 @@ import numpy as np
 import ta
 from datetime import datetime, timedelta
 import json
-import telegram  # Telegram alerts
+import telegram
+from dotenv import load_dotenv  # ✅ Import dotenv to load .env file
 
-# ✅ DEBUGGING: Print installed modules
+# ✅ Load environment variables from .env
+load_dotenv()
+
+# ✅ Check Installed Modules
 installed_modules = [module.name for module in pkgutil.iter_modules()]
 print(f"Installed modules: {installed_modules}")
 
-# ✅ CHECK & INSTALL OKX MODULE IF MISSING
+# ✅ Try Installing OKX Module if Missing
 try:
     import okx
 except ModuleNotFoundError:
     print("⚠️ OKX module not found. Installing...")
     subprocess.run([sys.executable, "-m", "pip", "install", "okx"])
-    import okx  # Try importing again
+    import okx
 
-# ✅ CHECK IF OKX API IS ACCESSIBLE
+# ✅ Verify OKX API Availability
 try:
     from okx import api
     print("✅ OKX API found:", dir(api))
-
-    # ✅ Initialize API Instances
     MarketData = api.Market()
     Trade = api.Trade()
     Account = api.Account()
@@ -37,14 +39,14 @@ except Exception as e:
     print("⚠️ ERROR: Failed to import OKX API:", str(e))
     exit(1)
 
-# ✅ SECURITY: Load Credentials
+# ✅ Load API Keys & Credentials from .env
 API_KEY = os.getenv('OKX_API_KEY')
 SECRET_KEY = os.getenv('OKX_SECRET_KEY')
 PASSPHRASE = os.getenv('OKX_PASSPHRASE')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 
-# ✅ DEBUG: Print environment variables (Remove this after testing)
+# ✅ DEBUG: Print which credentials are loaded
 print(f"OKX_API_KEY: {'✔' if API_KEY else '❌ MISSING'}")
 print(f"OKX_SECRET_KEY: {'✔' if SECRET_KEY else '❌ MISSING'}")
 print(f"OKX_PASSPHRASE: {'✔' if PASSPHRASE else '❌ MISSING'}")
@@ -67,48 +69,13 @@ if missing_vars:
 # ✅ Initialize Telegram Bot
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
-# ✅ LOGGING SETUP
+# ✅ Logging Setup
 logging.basicConfig(filename='okx_trading_bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ✅ TRADING PARAMETERS
-base_trade_size_usdt = 50   # Set to 50 USDT
-leverage = 5               # From backtest
-symbol = "SOL-USDT-SWAP"
-instId = "SOL-USDT-SWAP"
-lot_size = 0.1             # OKX contract size for SOL-USDT-SWAP
-SLIPPAGE = 0.002           # 0.2% slippage from backtest update
-FEES = 0.00075             # 0.075% fees from backtest update
-stop_loss_pct = 0.025      # 2.5% stop loss from backtest
-trailing_stop_factor = 1.8 # 1.8 × ATR trailing stop from backtest
-
-# ✅ STRATEGY PARAMETERS
-ema_short_period = 5
-ema_mid_period = 20
-ema_long_period = 100
-rsi_long_threshold = 55
-rsi_short_threshold = 45
-adx_4h_threshold = 12
-adx_15m_threshold = 15
-
-# ✅ STARTUP MESSAGE
-startup_message = (
-    f" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌\n"
-    f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    f"💰 Trade Size: {base_trade_size_usdt} USDT @ {leverage}x Leverage\n"
-    f"🎯 Symbol: {symbol}\n"
-    f"📊 Strategy: EMA {ema_short_period}/{ema_mid_period}/{ema_long_period}, RSI {rsi_long_threshold}/{rsi_short_threshold}, "
-    f"ADX 4H >= {adx_4h_threshold}, ADX 15M >= {adx_15m_threshold}\n"
-    f"🛡️ Risk: {stop_loss_pct*100:.1f}% SL, {trailing_stop_factor}×ATR Trailing Stop\n"
-    f"💸 Costs: {FEES*100:.3f}% Fees, {SLIPPAGE*100:.1f}% Slippage\n"
-    f"📬 Notifications: Telegram to Chat ID {CHAT_ID}"
-)
-print(startup_message)
-logging.info(startup_message)
-
-# ✅ DATA FETCHING FUNCTION
+# ✅ Fetch Data Function
 def fetch_recent_data(timeframe='4H', limit='400'):
     try:
-        response = MarketData.get_candles(instId=instId, bar=timeframe, limit=limit)
+        response = MarketData.get_candles(instId="SOL-USDT-SWAP", bar=timeframe, limit=limit)
         if response['code'] != '0':
             raise Exception(f"API error: {response.get('msg', 'Unknown')}")
         
@@ -121,10 +88,10 @@ def fetch_recent_data(timeframe='4H', limit='400'):
         print(f"⚠️ Error fetching data: {e}")
         return pd.DataFrame()
 
-# ✅ GET CURRENT PRICE
+# ✅ Get Current Price Function
 def get_current_price():
     try:
-        response = MarketData.get_ticker(instId=instId)
+        response = MarketData.get_ticker(instId="SOL-USDT-SWAP")
         if response['code'] == '0':
             return float(response['data'][0]['last'])
         else:
@@ -134,7 +101,7 @@ def get_current_price():
         print(f"⚠️ Failed to fetch price: {e}")
         return None
 
-# ✅ MAIN LOOP (LIVE TRADING)
+# ✅ Main Loop
 while True:
     try:
         df_4h = fetch_recent_data(timeframe='4H', limit='400')
