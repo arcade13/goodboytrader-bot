@@ -1,2 +1,1 @@
- # Empty for now
-pandas==2.2.1
+pandas==2.1.4
