@@ -8,7 +8,8 @@ import os
 import time
 from okx import MarketAPI as MarketData
 from okx import TradeAPI as Trade
-from okx import AccountAPI as Accountimport asyncio
+from okx import AccountAPI as Account
+import asyncio
 # ... other imports (leave them as is unless they're causing issues) ...
 import telegram  # Back to Telegram
 
