@@ -1,16 +1,13 @@
 import os
-import pandas as pd
-import ta
-from datetime import datetime, timedelta
-import logging
-import numpy as np
-import json
-import asyncio
-import telegram
-import time
-import okx.api.MarketDataAPI as MarketData
-import okx.api.TradeAPI as Trade
-import okx.api.AccountAPI as Account
+import okx.api
+
+# Debug: Inspect OKX api submodule
+print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
+print("OKX.api contents:", dir(okx.api))
+
+# Exit after debug
+import sys
+sys.exit(0)
 
 # Debug: Confirm OKX package structure
 print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
