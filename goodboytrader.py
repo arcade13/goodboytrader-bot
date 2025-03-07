@@ -5,10 +5,9 @@ import logging
 import numpy as np
 import json
 import os
-from okx import MarketAPI as MarketData
-from okx import TradeAPI as Trade
-from okx import AccountAPI as Account
-import asyncio
+from okx.Market import MarketAPI as MarketData
+from okx.Trade import TradeAPI as Trade
+from okx.Account import AccountAPI as Accountimport asyncio
 import telegram
 import time
 
