@@ -1,18 +1,16 @@
 import pandas as pd
 import ta
-import time
-from okx import MarketAPI as MarketData
-from okx import TradeAPI as Trade
-from okx import AccountAPI as Account
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import numpy as np
 import json
 import os
-import requests
-from textblob import TextBlob
-import telegram
+from okx import MarketAPI as MarketData
+from okx import TradeAPI as Trade
+from okx import AccountAPI as Account
 import asyncio
+import telegram
+import time
 
 # --- Security: Load credentials from environment variables ---
 API_KEY = os.getenv('OKX_API_KEY', 'e4529493-0b01-4ca4-9a16-8cc87aea60de')
