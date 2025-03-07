@@ -1,2 +1,2 @@
-3.12
-# Major version as recommended
+3.11
+# Using 3.11 for distutils compatibility
