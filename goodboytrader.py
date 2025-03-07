@@ -1,9 +1,9 @@
 import pandas as pd
 import ta
 import time
-import okx.Trade as Trade
-import okx.MarketData as MarketData
-import okx.Account as Account
+from okx import MarketAPI as MarketData
+from okx import TradeAPI as Trade
+from okx import AccountAPI as Account
 from datetime import datetime
 import logging
 import numpy as np
