@@ -4,4 +4,3 @@ ta
 numpy
 python-telegram-bot
 python-dotenv
-pendulum==2.1.2 # Pin to 2.1.2
