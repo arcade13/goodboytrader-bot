@@ -1,7 +1,1 @@
-okx==2.1.1
-pandas
-ta
-numpy
-python-telegram-bot
-python-dotenv
-pendulum==2.1.2
+okx==2.1.1  # Force full install
