@@ -5,16 +5,12 @@ import logging
 import numpy as np
 import json
 import os
-from dotenv import load_dotenv
-from okx import MarketAPI
-market_api = MarketAPI(flag='0')
+import okx.MarketData as MarketData
 import okx.Trade as Trade
 import okx.Account as Account
 import asyncio
 import telegram  # Back to Telegram
 import time
-
-load_dotenv()
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -306,30 +302,9 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-market_api = MarketData.MarketAPI(
-    api_key=API_KEY,
-    api_secret_key=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    use_server_time=False,
-    flag='0'
-)
-
-trade_api = Trade.TradeAPI(
-    api_key=API_KEY,
-    api_secret_key=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    use_server_time=False,
-    flag='0'
-)
-account_api = Account.AccountAPI(
-    api_key=API_KEY,
-    api_secret_key=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    use_server_time=False,
-    flag='0'
-)
-
-# Set position mode and leverage
+market_api = MarketData.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
@@ -367,3 +342,4 @@ while True:
         alert = f"🚨 Uh-oh! GoodBoyTrader hit a snag: {str(e)} 😵 Fixing it soon—stay tuned!"
         asyncio.run(send_telegram_alert(alert))
         time.sleep(60)
+
