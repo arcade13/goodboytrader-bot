@@ -1,3 +1,6 @@
+import okx
+print(f"OKX version: {okx.__version__}")
+print(f"Available submodules: {dir(okx)}")
 import pandas as pd
 import ta
 from datetime import datetime, timedelta
