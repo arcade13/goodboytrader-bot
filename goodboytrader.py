@@ -6,13 +6,11 @@ import numpy as np
 import json
 import os
 import time
-from okx.api import Market as MarketData
-from okx.api import Trade as Trade
-from okx.api import Account as Account
-import asyncio
+from okx import MarketAPI as MarketData
+from okx import TradeAPI as Trade
+from okx import AccountAPI as Accountimport asyncio
 # ... other imports (leave them as is unless they're causing issues) ...
 import telegram  # Back to Telegram
-import time
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -305,20 +303,20 @@ def monitor_position(position, entry_price, trade):
 
 # --- Initialization ---
 market_api = MarketData(
-    key=API_KEY,
-    secret=SECRET_KEY,
+    api_key=API_KEY,
+    api_secret_key=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0'  # '0' for live trading, '1' for demo
 )
 trade_api = Trade(
-    key=API_KEY,
-    secret=SECRET_KEY,
+    api_key=API_KEY,
+    api_secret_key=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0'
 )
 account_api = Account(
-    key=API_KEY,
-    secret=SECRET_KEY,
+    api_key=API_KEY,
+    api_secret_key=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0'
 )
