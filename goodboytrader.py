@@ -1,6 +1,11 @@
 import okx
 print(f"OKX version: {okx.__version__}")
 print(f"Available submodules: {dir(okx)}")
+try:
+    from okx import Market
+    print("Market submodule exists: ", dir(Market))
+except ImportError as e:
+    print(f"Failed to import Market: {e}")
 import pandas as pd
 import ta
 from datetime import datetime, timedelta
