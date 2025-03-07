@@ -1,0 +1,6 @@
+okx==2.1.1
+pandas
+ta
+numpy
+python-telegram-bot
+python-dotenv
