@@ -6,12 +6,11 @@ import numpy as np
 import json
 import os
 import time
-from okx import MarketAPI as MarketData
-from okx import TradeAPI as Trade
-from okx import AccountAPI as Account
+from okx.Market import MarketAPI as MarketData  # Corrected import
+from okx.Trade import TradeAPI as Trade         # Corrected import
+from okx.Account import AccountAPI as Account  # Corrected import
 import asyncio
-# ... other imports (leave them as is unless they're causing issues) ...
-import telegram  # Back to Telegram
+import telegram  # Telegram integration
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -21,8 +20,10 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
 CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
 
 # --- Validate credentials ---
-required_vars = {'OKX_API_KEY': API_KEY, 'OKX_SECRET_KEY': SECRET_KEY, 'OKX_PASSPHRASE': PASSPHRASE, 
-                'TELEGRAM_TOKEN': TELEGRAM_TOKEN, 'CHAT_ID': CHAT_ID}
+required_vars = {
+    'OKX_API_KEY': API_KEY, 'OKX_SECRET_KEY': SECRET_KEY, 'OKX_PASSPHRASE': PASSPHRASE,
+    'TELEGRAM_TOKEN': TELEGRAM_TOKEN, 'CHAT_ID': CHAT_ID
+}
 for var_name, var_value in required_vars.items():
     if var_name == 'CHAT_ID' and not var_value.isdigit() and var_value == f'your_{var_name.lower()}':
         print(f"⚠️ Error: {var_name} must be a numeric chat ID or properly set.")
@@ -150,12 +151,12 @@ def clear_trade_state():
 def calculate_indicators(df, timeframe='4H'):
     if len(df) < ema_long_period:
         return df
-    df['ema_short'] = ta.trend.ema_indicator(df['close'], window=ema_short_period)  # EMA 5
-    df['ema_mid'] = ta.trend.ema_indicator(df['close'], window=ema_mid_period)      # EMA 20
-    df['ema_long'] = ta.trend.ema_indicator(df['close'], window=ema_long_period)    # EMA 100
-    df['rsi'] = ta.momentum.rsi(df['close'], window=14)                            # RSI 14
-    df['adx'] = ta.trend.adx(df['high'], df['low'], df['close'], window=14)        # ADX 14
-    df['atr'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)  # ATR 14
+    df['ema_short'] = ta.trend.ema_indicator(df['close'], window=ema_short_period)
+    df['ema_mid'] = ta.trend.ema_indicator(df['close'], window=ema_mid_period)
+    df['ema_long'] = ta.trend.ema_indicator(df['close'], window=ema_long_period)
+    df['rsi'] = ta.momentum.rsi(df['close'], window=14)
+    df['adx'] = ta.trend.adx(df['high'], df['low'], df['close'], window=14)
+    df['atr'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)
     df['atr_mean'] = df['atr'].rolling(14).mean()
     return df
 
@@ -164,7 +165,7 @@ def fetch_recent_data(timeframe='4H', limit='400'):
     response = fetch_with_retries(lambda: market_api.get_candlesticks(instId=instId, bar=timeframe, limit=limit))
     if not response:
         return pd.DataFrame()
-    data = response['data'][::-1]
+    data = response['data'][::-1]  # Reverse to chronological order
     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
     df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
     df[['open', 'high', 'low', 'close', 'vol']] = df[['open', 'high', 'low', 'close', 'vol']].astype(float)
@@ -210,31 +211,33 @@ def place_order(side, price, size_usdt):
     global entry_atr
     size_sol = size_usdt / price
     size_contracts = max(round(size_sol / lot_size), 1)
-    response = trade_api.place_order(
+    response = fetch_with_retries(lambda: trade_api.place_order(
         instId=instId, tdMode='cross', side='buy' if side == 'long' else 'sell',
         posSide=side, ordType='market', sz=str(size_contracts)
-    )
-    if response['code'] == '0':
+    ))
+    if response and response['code'] == '0':
         size_sol = size_contracts * lot_size
         alert = f"🎉 GoodBoyTrader jumps in! {side.capitalize()} at {price:.2f} 🚀 Size: {size_sol:.4f} SOL 🌞 Let’s ride the wave!"
         asyncio.run(send_telegram_alert(alert))
         return response['data'][0]['ordId'], size_sol
     else:
-        logging.error(f"Order failed: {response.get('msg', 'Unknown error')}")
+        error_msg = response.get('msg', 'Unknown error') if response else 'No response'
+        logging.error(f"Order failed: {error_msg}")
         return None, 0
 
 def close_order(side, price, size_sol, exit_type=''):
     size_contracts = round(size_sol / lot_size)
-    response = trade_api.place_order(
+    response = fetch_with_retries(lambda: trade_api.place_order(
         instId=instId, tdMode='cross', side=side,
         posSide='long' if side == 'sell' else 'short',
         ordType='market', sz=str(size_contracts)
-    )
-    if response['code'] == '0':
+    ))
+    if response and response['code'] == '0':
         print(f" 🏁 Closed {size_sol:.4f} SOL at {price:.2f} ({exit_type})")
         return True
     else:
-        logging.error(f"Close order failed: {response.get('msg', 'Unknown error')}")
+        error_msg = response.get('msg', 'Unknown error') if response else 'No response'
+        logging.error(f"Close order failed: {error_msg}")
         return False
 
 # --- Position Monitoring ---
@@ -307,24 +310,40 @@ market_api = MarketData(
     api_key=API_KEY,
     api_secret_key=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'  # '0' for live trading, '1' for demo
+    flag='0',  # '0' for live trading, '1' for demo
+    domain='https://www.okx.com'  # Explicit domain added
 )
 trade_api = Trade(
     api_key=API_KEY,
     api_secret_key=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'
+    flag='0',
+    domain='https://www.okx.com'  # Explicit domain added
 )
 account_api = Account(
     api_key=API_KEY,
     api_secret_key=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'
+    flag='0',
+    domain='https://www.okx.com'  # Explicit domain added
 )
 
-# Set position mode and leverage
-account_api.set_position_mode(posMode="long_short_mode")
-account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
+# Set position mode and leverage with error handling
+try:
+    account_api.set_position_mode(posMode="long_short_mode")
+    print("Position mode set to long_short_mode")
+except Exception as e:
+    logging.error(f"Failed to set position mode: {e}")
+    print(f"⚠️ Failed to set position mode: {e}")
+    exit(1)
+
+try:
+    account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
+    print(f"Leverage set to {leverage}x for {instId}")
+except Exception as e:
+    logging.error(f"Failed to set leverage: {e}")
+    print(f"⚠️ Failed to set leverage: {e}")
+    exit(1)
 
 # --- Main Loop (Live Trading) ---
 position_state, trade = load_trade_state()
@@ -339,6 +358,7 @@ while True:
 
         entry_price = get_current_price()
         if not entry_price:
+            print("Failed to fetch current price, retrying...")
             time.sleep(60)
             continue
 
@@ -353,6 +373,9 @@ while True:
                     position_state = signal
                     save_trade_state(trade, position_state)
                     monitor_position(position_state, entry_price, trade)
+        else:
+            print(f"Monitoring existing {position_state} position...")
+            monitor_position(position_state, trade['entry_price'], trade)
 
         time.sleep(60)  # Check every minute
     except Exception as e:
@@ -360,4 +383,3 @@ while True:
         alert = f"🚨 Uh-oh! GoodBoyTrader hit a snag: {str(e)} 😵 Fixing it soon—stay tuned!"
         asyncio.run(send_telegram_alert(alert))
         time.sleep(60)
-
