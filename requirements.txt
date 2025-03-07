@@ -1,1 +1,2 @@
  # Empty for now
+pandas==2.2.1
