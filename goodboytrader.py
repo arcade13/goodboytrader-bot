@@ -305,7 +305,7 @@ def monitor_position(position, entry_price, trade):
 # --- Initialization ---
 market_api = MarketData()
 trade_api = Trade()
-account_api = Account(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = Account()
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
