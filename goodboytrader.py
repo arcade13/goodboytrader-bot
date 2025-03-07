@@ -1,6 +1,5 @@
 import os
 print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
-import okx.MarketData as MarketData  # Keep this to trigger the error
 import pandas as pd
 import ta
 from datetime import datetime, timedelta
