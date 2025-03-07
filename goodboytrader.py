@@ -8,7 +8,12 @@ import json
 import asyncio
 import telegram
 import time
-from okx.api import MarketAPI, TradeAPI, AccountAPI
+import okx.Market as Market
+import okx.Trade as Trade
+import okx.Account as Account
+
+# Debug: Inspect OKX package
+print("OKX package contents:", os.listdir('/opt/render/project/src/.venv/lib/python3.11/site-packages/okx'))
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -300,9 +305,9 @@ def monitor_position(position, entry_price, trade):
         time.sleep(10)
 
 # --- Initialization ---
-market_api = MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-trade_api = TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-account_api = AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+market_api = Market.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
