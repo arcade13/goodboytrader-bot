@@ -48,28 +48,18 @@ TELEGRAM_CHAT_ID = int(CHAT_ID)
 # Define the correct base URL
 BASE_API_URL = "https://www.okx.com"
 
-# ✅ Initialize OKX API Clients with correct domain
-market_api = Market(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0',
-    domain=BASE_API_URL  # Use 'domain' instead of 'base_url'
-)
-trade_api = Trade(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0',
-    domain=BASE_API_URL
-)
-account_api = Account(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0',
-    domain=BASE_API_URL
-)
+# ✅ Initialize OKX API Clients
+market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+
+# 🔥 Patch the base URL to force the correct domain (https://www.okx.com)
+market_api.rest_api._base_url = "https://www.okx.com"
+trade_api.rest_api._base_url = "https://www.okx.com"
+account_api.rest_api._base_url = "https://www.okx.com"
+
+# ✅ Optional Debugging (Check if the patch applied)
+print(f"DEBUG: Market API base URL set to: {market_api.rest_api._base_url}")
 
 # Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
