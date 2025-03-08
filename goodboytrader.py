@@ -2,6 +2,7 @@ import time
 import logging
 import requests
 import json
+import asyncio
 from datetime import datetime
 from okx.api import Market, Trade
 from telegram import Bot
@@ -31,10 +32,10 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 
 # -------------------- HELPER FUNCTIONS -------------------- #
-def send_telegram_message(message):
-    """Send alerts to Telegram"""
+async def send_telegram_message(message):
+    """Send alerts to Telegram (async)"""
     try:
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.info(f"Telegram Alert Sent: {message}")
     except Exception as e:
         logging.error(f"Failed to send Telegram alert: {str(e)}")
@@ -49,11 +50,11 @@ def fetch_recent_data(timeframe="4H", limit=100):
             return response["data"]
         else:
             logging.error(f"❌ Failed to fetch {timeframe} data: {response}")
-            send_telegram_message(f"⚠️ Error fetching market data: {response}")
+            asyncio.run(send_telegram_message(f"⚠️ Error fetching market data: {response}"))
             return None
     except requests.exceptions.RequestException as e:
         logging.error(f"Data fetch failed: {str(e)}")
-        send_telegram_message(f"⚠️ Error fetching market data: {str(e)}")
+        asyncio.run(send_telegram_message(f"⚠️ Error fetching market data: {str(e)}"))
         return None
 
 
@@ -81,19 +82,19 @@ def execute_trade(side, size="50"):
 
         if response.get("code") == "0":
             logging.info(f"✅ Trade Executed: {side.upper()} - Size: {size}")
-            send_telegram_message(f"✅ Trade Executed: {side.upper()} - Size: {size}")
+            asyncio.run(send_telegram_message(f"✅ Trade Executed: {side.upper()} - Size: {size}"))
         else:
             logging.error(f"❌ Trade Execution Failed: {response}")
-            send_telegram_message(f"⚠️ Trade Failed: {response}")
+            asyncio.run(send_telegram_message(f"⚠️ Trade Failed: {response}"))
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Trade execution failed: {str(e)}")
-        send_telegram_message(f"⚠️ Error executing trade: {str(e)}")
+        asyncio.run(send_telegram_message(f"⚠️ Error executing trade: {str(e)}"))
 
 
 # -------------------- MAIN BOT LOGIC -------------------- #
 logging.info("🚀 GoodBoyTrader Bot Starting...")
-send_telegram_message("🚀 GoodBoyTrader Bot Started!")
+asyncio.run(send_telegram_message("🚀 GoodBoyTrader Bot Started!"))
 
 while True:
     logging.info("🔄 Checking for trade signals...")
