@@ -7,13 +7,17 @@ import ta
 from datetime import datetime
 import okx
 import pkgutil
+
+# Optional debug (remove after confirmation)
+print("OKX version:", okx.__version__)
+print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
+
 from okx.MarketData import MarketAPI
 from okx.Trade import TradeAPI
 from okx.Account import AccountAPI
 
-# Rest of your code (e.g., logging, bot initialization)
 import logging
-# ... your bot logic ...
+# ... rest of your bot code ...
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
 # ... etc. ...
