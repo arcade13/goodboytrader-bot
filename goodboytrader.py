@@ -5,69 +5,57 @@ import logging
 import numpy as np
 import json
 import os
+import time
 import asyncio
 import telegram
-import time
 
-# ✅ Corrected OKX API Imports
-from okx import MarketAPI, TradeAPI, AccountAPI
+# ✅ FIXED IMPORTS
+from okx.api import Market, Trade, Account
 
-# --- Security: Load credentials ---
-API_KEY = os.getenv('OKX_API_KEY', '')
-SECRET_KEY = os.getenv('OKX_SECRET_KEY', '')
-PASSPHRASE = os.getenv('OKX_PASSPHRASE', '')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '')
-CHAT_ID = os.getenv('CHAT_ID', '')
+# --- Load credentials from Environment Variables ---
+API_KEY = os.getenv('OKX_API_KEY')
+SECRET_KEY = os.getenv('OKX_SECRET_KEY')
+PASSPHRASE = os.getenv('OKX_PASSPHRASE')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+CHAT_ID = os.getenv('CHAT_ID')
 
-# --- Validate credentials ---
-required_vars = {'OKX_API_KEY': API_KEY, 'OKX_SECRET_KEY': SECRET_KEY, 'OKX_PASSPHRASE': PASSPHRASE, 'TELEGRAM_TOKEN': TELEGRAM_TOKEN, 'CHAT_ID': CHAT_ID}
-for var_name, var_value in required_vars.items():
-    if not var_value:
-        print(f"⚠️ Error: {var_name} is missing. Set it in environment variables.")
-        exit(1)
+# Validate environment variables
+if not all([API_KEY, SECRET_KEY, PASSPHRASE, TELEGRAM_TOKEN, CHAT_ID]):
+    raise ValueError("⚠️ Missing required environment variables. Please check your .env or Render settings.")
 
-# --- Initialize Telegram Bot ---
+# ✅ Initialize OKX APIs
+market_api = Market.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+
+# ✅ Initialize Telegram Bot
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
-# --- Logging Setup ---
+# ✅ Logging Setup
 logging.basicConfig(filename='okx_trading_bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Trading Parameters ---
-TRADE_SIZE_USDT = 50  # Fixed at 50 USDT
-LEVERAGE = 5          # ✅ Corrected to 5x leverage
-SYMBOL = "SOL-USDT-SWAP"
-INST_ID = "SOL-USDT-SWAP"
-LOT_SIZE = 0.1  # Contract size
-SLIPPAGE = 0.002  # 0.2% slippage
-FEES = 0.00075  # 0.075% fees
-STOP_LOSS_PCT = 0.025  # 2.5% stop loss
-TRAILING_STOP_FACTOR = 1.8  # 1.8 × ATR trailing stop
+# ✅ Trading Parameters
+trade_size = 50
+leverage = 5
+symbol = "SOL-USDT-SWAP"
+stop_loss_pct = 0.025
+trailing_stop_factor = 1.8
+fees = 0.00075
+slippage = 0.002
 
-# --- Indicator Settings ---
-EMA_SHORT = 5
-EMA_MID = 20
-EMA_LONG = 100
-RSI_LONG_THRESH = 55
-RSI_SHORT_THRESH = 45
-ADX_4H_THRESH = 12
-ADX_15M_THRESH = 15
+# ✅ Notify on Start
+startup_message = f"🚀 GoodBoyTrader Initialized | {symbol} | {leverage}x Leverage"
+print(startup_message)
+logging.info(startup_message)
 
-# --- Initialize OKX API ---
-market_api = MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-trade_api = TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-account_api = AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-
-# Set leverage and position mode
-account_api.set_position_mode(posMode="long_short_mode")
-account_api.set_leverage(instId=INST_ID, lever=str(LEVERAGE), mgnMode="cross")
-
-# --- Utility Functions ---
+# ✅ Utility Functions
 async def send_telegram_alert(message):
     try:
         await bot.send_message(chat_id=CHAT_ID, text=message)
         logging.info(f"Telegram alert sent: {message}")
     except Exception as e:
         logging.error(f"Failed to send Telegram alert: {str(e)}")
+        print(f"⚠️ Telegram alert failed: {str(e)}")
 
 def fetch_with_retries(api_call, max_attempts=3):
     for attempt in range(max_attempts):
@@ -78,64 +66,78 @@ def fetch_with_retries(api_call, max_attempts=3):
             return response
         except Exception as e:
             logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
-            if attempt < max_attempts - 1:
-                time.sleep(5 * (attempt + 1))
-            else:
-                return None
-
-# --- Fetch Market Data ---
-def fetch_recent_data(timeframe='4H', limit='400'):
-    response = fetch_with_retries(lambda: market_api.get_candlesticks(instId=INST_ID, bar=timeframe, limit=limit))
-    if not response:
-        return pd.DataFrame()
-    data = response['data'][::-1]
-    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol'])
-    df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
-    df[['open', 'high', 'low', 'close']] = df[['open', 'high', 'low', 'close']].astype(float)
-    return df
-
-def get_current_price():
-    response = fetch_with_retries(lambda: market_api.get_ticker(instId=INST_ID))
-    return float(response['data'][0]['last']) if response else None
-
-# --- Entry Strategy ---
-def check_entry(df_4h, df_15m):
-    if len(df_4h) < EMA_LONG or len(df_15m) < EMA_LONG:
-        return None
-
-    if df_4h['close'].iloc[-1] > df_4h['ema_short'].iloc[-1] > df_4h['ema_mid'].iloc[-1] > df_4h['ema_long'].iloc[-1] and df_4h['rsi'].iloc[-1] > RSI_LONG_THRESH and df_4h['adx'].iloc[-1] >= ADX_4H_THRESH:
-        if df_15m['ema_short'].iloc[-1] > df_15m['ema_mid'].iloc[-1] > df_15m['ema_long'].iloc[-1] and df_15m['close'].iloc[-1] > df_15m['ema_long'].iloc[-1] and df_15m['rsi'].iloc[-1] > RSI_LONG_THRESH and df_15m['adx'].iloc[-1] >= ADX_15M_THRESH:
-            return 'long'
-
-    if df_4h['close'].iloc[-1] < df_4h['ema_short'].iloc[-1] < df_4h['ema_mid'].iloc[-1] < df_4h['ema_long'].iloc[-1] and df_4h['rsi'].iloc[-1] < RSI_SHORT_THRESH and df_4h['adx'].iloc[-1] >= ADX_4H_THRESH:
-        if df_15m['ema_short'].iloc[-1] < df_15m['ema_mid'].iloc[-1] < df_15m['ema_long'].iloc[-1] and df_15m['close'].iloc[-1] < df_15m['ema_long'].iloc[-1] and df_15m['rsi'].iloc[-1] < RSI_SHORT_THRESH and df_15m['adx'].iloc[-1] >= ADX_15M_THRESH:
-            return 'short'
-
+            time.sleep(5 * (attempt + 1))
     return None
 
-# --- Trading Loop ---
+# ✅ Fetch Market Data
+def fetch_recent_data(timeframe='4H', limit='400'):
+    response = fetch_with_retries(lambda: market_api.get_candlesticks(instId=symbol, bar=timeframe, limit=limit))
+    if not response:
+        return pd.DataFrame()
+    
+    data = response['data'][::-1]
+    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
+    df[['open', 'high', 'low', 'close', 'vol']] = df[['open', 'high', 'low', 'close', 'vol']].astype(float)
+    return df
+
+# ✅ Entry Logic
+def check_entry(df_4h, df_15m):
+    if len(df_4h) < 100 or len(df_15m) < 100:
+        return None
+
+    current_4h = df_4h.iloc[-1]
+    current_15m = df_15m.iloc[-1]
+
+    bullish_4h = (current_4h['close'] > current_4h['ema_5'] > current_4h['ema_20'] > current_4h['ema_100'])
+    bearish_4h = (current_4h['close'] < current_4h['ema_5'] < current_4h['ema_20'] < current_4h['ema_100'])
+
+    bullish_15m = (current_15m['close'] > current_15m['ema_5'] > current_15m['ema_20'] > current_15m['ema_100'])
+    bearish_15m = (current_15m['close'] < current_15m['ema_5'] < current_15m['ema_20'] < current_15m['ema_100'])
+
+    if bullish_4h and bullish_15m:
+        return "long"
+    elif bearish_4h and bearish_15m:
+        return "short"
+    return None
+
+# ✅ Place Order
+def place_order(side, price, size):
+    response = trade_api.place_order(instId=symbol, tdMode='cross', side=side, ordType='market', sz=str(size))
+    return response
+
+# ✅ Monitor Position
+def monitor_position(position, entry_price):
+    while True:
+        price = fetch_recent_data(timeframe='1m', limit='1')['close'].iloc[-1]
+        print(f"Current Price: {price}")
+
+        if position == "long" and price >= entry_price * 1.05:
+            print("📈 Take Profit Hit! Exiting long position.")
+            place_order("sell", price, trade_size)
+            break
+        elif position == "short" and price <= entry_price * 0.95:
+            print("📉 Take Profit Hit! Exiting short position.")
+            place_order("buy", price, trade_size)
+            break
+
+        time.sleep(10)
+
+# ✅ Main Loop
 while True:
-    try:
-        df_4h = fetch_recent_data('4H', '400')
-        df_15m = fetch_recent_data('15m', '100')
+    df_4h = fetch_recent_data(timeframe='4H', limit='100')
+    df_15m = fetch_recent_data(timeframe='15m', limit='100')
 
-        if df_4h.empty or df_15m.empty:
-            print("❌ Not enough data. Retrying in 1 min...")
-            time.sleep(60)
-            continue
-
-        entry_price = get_current_price()
-        if not entry_price:
-            time.sleep(60)
-            continue
-
-        signal = check_entry(df_4h, df_15m)
-        if signal:
-            alert = f"🚀 Trade Signal: {signal.upper()} on {SYMBOL} at {entry_price:.2f}"
-            asyncio.run(send_telegram_alert(alert))
-
-        time.sleep(60)  # Check every minute
-    except Exception as e:
-        logging.error(f"Error: {str(e)}")
+    if df_4h.empty or df_15m.empty:
+        print("Waiting for sufficient data...")
         time.sleep(60)
+        continue
+
+    signal = check_entry(df_4h, df_15m)
+    if signal:
+        entry_price = fetch_recent_data(timeframe='1m', limit='1')['close'].iloc[-1]
+        place_order(signal, entry_price, trade_size)
+        monitor_position(signal, entry_price)
+
+    time.sleep(60)
 
