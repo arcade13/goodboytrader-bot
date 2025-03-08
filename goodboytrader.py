@@ -1,123 +1,140 @@
-import pandas as pd
-import ta
-import json
 import os
 import time
+import json
 import logging
-from datetime import datetime
-from okx.api import Trade, Market, Account
 import asyncio
+import pandas as pd
+import ta
+import requests
+from datetime import datetime
+from okx.api import Market, Trade, Account
 import telegram
 
-# --- Load Credentials ---
-API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
-SECRET_KEY = os.getenv('OKX_SECRET_KEY', 'your_okx_secret_key')
-PASSPHRASE = os.getenv('OKX_PASSPHRASE', 'your_okx_passphrase')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
-CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
+# --- Load Environment Variables ---
+API_KEY = os.getenv("OKX_API_KEY")
+SECRET_KEY = os.getenv("OKX_SECRET_KEY")
+PASSPHRASE = os.getenv("OKX_PASSPHRASE")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+SYMBOL = "SOL-USDT-SWAP"
 
-# --- Initialize OKX APIs ---
-trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE)
-market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE)
-account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE)
+# --- API Clients ---
+market_api = Market()
+trade_api = Trade()
+account_api = Account()
 
-# --- Logging Setup ---
-logging.basicConfig(filename='goodboytrader.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --- Trading Parameters ---
+TRADE_SIZE_USDT = 50  # Fixed trade size in USDT
+LEVERAGE = 5  # 5x leverage
+STOP_LOSS_PERCENT = 0.025  # 2.5% Stop Loss
+TRAILING_STOP_ATR_FACTOR = 1.8  # 1.8x ATR
+FEES = 0.00075  # Trading fees (0.075%)
+SLIPPAGE = 0.002  # 0.2% slippage
 
-# --- Trading Config ---
-symbol = "SOL-USDT-SWAP"
-leverage = 5
-base_trade_size_usdt = 50
-ema_short = 5
-ema_mid = 20
-ema_long = 100
-rsi_long = 55
-rsi_short = 45
-adx_4h = 12
-adx_15m = 15
-stop_loss_pct = 0.025
-trailing_stop_factor = 1.8
+# --- Indicator Parameters ---
+EMA_SHORT = 5
+EMA_MID = 20
+EMA_LONG = 100
+RSI_LONG_THRESHOLD = 55
+RSI_SHORT_THRESHOLD = 45
+ADX_4H_THRESHOLD = 12
+ADX_15M_THRESHOLD = 15
 
-# --- Telegram Bot ---
+# --- Initialize Logging ---
+logging.basicConfig(filename="goodboytrader.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+
+# --- Initialize Telegram Bot ---
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
-async def send_telegram_alert(message):
+# --- Function to Fetch Market Data ---
+def fetch_recent_data(timeframe="4H", limit=100):
     try:
-        await bot.send_message(chat_id=CHAT_ID, text=message)
-        logging.info(f"Telegram alert sent: {message}")
-    except Exception as e:
-        logging.error(f"Failed to send Telegram alert: {str(e)}")
-
-# --- Fetch Market Data ---
-def fetch_recent_data(timeframe='4H', limit=10):
-    try:
-        response = market_api.get_candles(instId=symbol, bar=timeframe, limit=limit)
-        if response.get("code") != "0":
-            print(f"❌ API Error: {response.get('msg', 'Unknown error')}")
+        response = market_api.get_candles(instId=SYMBOL, bar=timeframe, limit=str(limit))
+        if response["code"] != "0":
+            logging.error(f"API Error: {response['msg']}")
             return pd.DataFrame()
         
-        data = response.get("data", [])
-        if not data:
-            print("⚠️ No market data received!")
-            return pd.DataFrame()
-        
+        data = response["data"][::-1]
         df = pd.DataFrame(data, columns=["timestamp", "open", "high", "low", "close", "vol", "volCcy", "volCcyQuote", "confirm"])
         df["timestamp"] = pd.to_datetime(df["timestamp"].astype(int), unit="ms")
         df[["open", "high", "low", "close", "vol"]] = df[["open", "high", "low", "close", "vol"]].astype(float)
         return df
     except Exception as e:
-        print(f"⚠️ Data fetch failed: {str(e)}")
+        logging.error(f"Data fetch failed: {e}")
         return pd.DataFrame()
 
-# --- Indicator Calculations ---
+# --- Function to Calculate Indicators ---
 def calculate_indicators(df):
-    if len(df) < ema_long:
+    if len(df) < EMA_LONG:
         return df
-    df["ema_short"] = ta.trend.ema_indicator(df["close"], window=ema_short)
-    df["ema_mid"] = ta.trend.ema_indicator(df["close"], window=ema_mid)
-    df["ema_long"] = ta.trend.ema_indicator(df["close"], window=ema_long)
+    df["ema_short"] = ta.trend.ema_indicator(df["close"], window=EMA_SHORT)
+    df["ema_mid"] = ta.trend.ema_indicator(df["close"], window=EMA_MID)
+    df["ema_long"] = ta.trend.ema_indicator(df["close"], window=EMA_LONG)
     df["rsi"] = ta.momentum.rsi(df["close"], window=14)
     df["adx"] = ta.trend.adx(df["high"], df["low"], df["close"], window=14)
+    df["atr"] = ta.volatility.average_true_range(df["high"], df["low"], df["close"], window=14)
     return df
 
-# --- Trading Execution ---
-def execute_trade():
-    df_4h = fetch_recent_data(timeframe='4H', limit=100)
-    df_15m = fetch_recent_data(timeframe='15m', limit=100)
-    
-    if df_4h.empty or df_15m.empty:
-        print("⚠️ No data available, retrying...")
-        return
-    
-    df_4h = calculate_indicators(df_4h)
-    df_15m = calculate_indicators(df_15m)
-    
-    if len(df_4h) < ema_long or len(df_15m) < ema_long:
-        print("⚠️ Not enough data for indicators")
-        return
-    
+# --- Function to Check Trade Entry Conditions ---
+def check_entry(df_4h, df_15m):
     last_4h = df_4h.iloc[-1]
     last_15m = df_15m.iloc[-1]
+
+    bullish_4h = (last_4h["close"] > last_4h["ema_short"] > last_4h["ema_mid"] > last_4h["ema_long"]
+                  and last_4h["rsi"] > RSI_LONG_THRESHOLD and last_4h["adx"] >= ADX_4H_THRESHOLD)
     
-    # Check Long Entry
-    if last_4h["ema_short"] > last_4h["ema_mid"] > last_4h["ema_long"] and last_4h["rsi"] > rsi_long and last_4h["adx"] >= adx_4h:
-        if last_15m["ema_short"] > last_15m["ema_mid"] > last_15m["ema_long"] and last_15m["rsi"] > rsi_long and last_15m["adx"] >= adx_15m:
-            print("📈 Long Entry Detected!")
-            asyncio.run(send_telegram_alert("📈 Long Entry Detected!"))
-            return
+    bearish_4h = (last_4h["close"] < last_4h["ema_short"] < last_4h["ema_mid"] < last_4h["ema_long"]
+                  and last_4h["rsi"] < RSI_SHORT_THRESHOLD and last_4h["adx"] >= ADX_4H_THRESHOLD)
     
-    # Check Short Entry
-    if last_4h["ema_short"] < last_4h["ema_mid"] < last_4h["ema_long"] and last_4h["rsi"] < rsi_short and last_4h["adx"] >= adx_4h:
-        if last_15m["ema_short"] < last_15m["ema_mid"] < last_15m["ema_long"] and last_15m["rsi"] < rsi_short and last_15m["adx"] >= adx_15m:
-            print("📉 Short Entry Detected!")
-            asyncio.run(send_telegram_alert("📉 Short Entry Detected!"))
-            return
+    bullish_15m = (last_15m["ema_short"] > last_15m["ema_mid"] > last_15m["ema_long"]
+                   and last_15m["close"] > last_15m["ema_long"] and last_15m["rsi"] > RSI_LONG_THRESHOLD
+                   and last_15m["adx"] >= ADX_15M_THRESHOLD)
     
-    print("✅ No trade conditions met, waiting...")
+    bearish_15m = (last_15m["ema_short"] < last_15m["ema_mid"] < last_15m["ema_long"]
+                   and last_15m["close"] < last_15m["ema_long"] and last_15m["rsi"] < RSI_SHORT_THRESHOLD
+                   and last_15m["adx"] >= ADX_15M_THRESHOLD)
+
+    if bullish_4h and bullish_15m:
+        return "long"
+    if bearish_4h and bearish_15m:
+        return "short"
+    return None
+
+# --- Function to Place Orders ---
+def place_order(side, price):
+    size = TRADE_SIZE_USDT / price
+    response = trade_api.place_order(instId=SYMBOL, tdMode="cross", side="buy" if side == "long" else "sell",
+                                     posSide=side, ordType="market", sz=str(round(size, 2)))
+
+    if response["code"] == "0":
+        logging.info(f"Order executed: {side} at {price}")
+        asyncio.run(bot.send_message(chat_id=CHAT_ID, text=f"🚀 {side.upper()} position opened at {price}"))
+        return response["data"][0]["ordId"], size
+    else:
+        logging.error(f"Order failed: {response['msg']}")
+        return None, 0
 
 # --- Main Loop ---
-print("🚀 GoodBoyTrader Bot Started!")
 while True:
-    execute_trade()
+    logging.info("🔄 Checking for trade signals...")
+
+    df_4h = calculate_indicators(fetch_recent_data("4H"))
+    df_15m = calculate_indicators(fetch_recent_data("15m"))
+
+    if df_4h.empty or df_15m.empty:
+        logging.warning("⚠️ No data available, retrying...")
+        time.sleep(60)
+        continue
+
+    entry_signal = check_entry(df_4h, df_15m)
+    current_price = df_15m.iloc[-1]["close"]
+
+    if entry_signal:
+        order_id, size = place_order(entry_signal, current_price)
+        if order_id:
+            logging.info(f"✅ Trade placed: {entry_signal} at {current_price}")
+    else:
+        logging.info("⏳ No trade signal detected, waiting...")
+
     time.sleep(60)
 
