@@ -25,10 +25,8 @@ logging.info(f"OKX contents: {dir(okx)}")
 print(f"OKX SDK version: {okx.__version__}")
 print(f"OKX contents: {dir(okx)}")
 
-# ✅ Correct OKX API Imports
-from okx.api import Market
-from okx.api import Trade
-from okx.api import Account
+# ✅ Correct OKX API Imports (ensure these are at the top)
+from okx.api import Market, Trade, Account
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
@@ -47,10 +45,10 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
 
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API Clients
-market_api = MarketAPI.MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-trade_api = TradeAPI.TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-account_api = AccountAPI.AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+# ✅ Initialize OKX API Clients (NO `.MarketAPI`, `.TradeAPI`, or `.AccountAPI`)
+market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 
 # Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -312,11 +310,6 @@ async def monitor_position(position, entry_price, trade):
                 clear_trade_state()
                 return
         await asyncio.sleep(10)
-
-# ✅ Initialize OKX API Clients (NO `.MarketAPI`, `.TradeAPI`, or `.AccountAPI`)
-market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 
 # Main Function
 async def main():
