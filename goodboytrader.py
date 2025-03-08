@@ -21,25 +21,27 @@ from okx.api import Market
 from okx.api import Trade
 from okx.api import Account
 
-# Debug constructor args
-print("Market init args:", Market.__init__.__code__.co_varnames)
-
 # Alias to match your code
 MarketAPI = Market
 TradeAPI = Trade
 AccountAPI = Account
 
-# Load credentials
+# Load Environment Variables
 API_KEY = os.getenv("API_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY")
 PASSPHRASE = os.getenv("PASSPHRASE")
-# Debug env vars (redact sensitive data in production)
-print("Env vars loaded:", "API_KEY" in os.environ, "SECRET_KEY" in os.environ, "PASSPHRASE" in os.environ)
+
+# Debug env vars
+print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None}")
+
+# Validate credentials
+if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
+    raise ValueError("Missing API_KEY, SECRET_KEY, or PASSPHRASE. Set them in Render's Environment settings.")
 
 # Initialize OKX API clients
-market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-trade_api = TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+trade_api = TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 
 # Bot Startup
 logging.info("Starting GoodBoyTrader...")
@@ -48,11 +50,10 @@ print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
 # Async main function
 async def main():
     logging.info("Bot is running...")
-    # Add your trading logic here
+    # Add your trading logic here (e.g., fetch candlesticks, send Telegram alerts)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 # **Configure Logging**
 logging.basicConfig(
     filename="goodboytrader.log",
