@@ -5,10 +5,13 @@ import json
 import pandas as pd
 import ta
 from datetime import datetime
-import okx.MarketData as MarketData
-import okx.Trade as Trade
-import okx.Account as Account
+from okx import MarketData as MarketDataAPI  # Fixed import
+from okx import Trade as TradeAPI          # Fixed import
+from okx import Account as AccountAPI      # Fixed import
 from telegram import Bot
+import subprocess
+import sys
+import inspect
 
 # **Configure Logging**
 logging.basicConfig(
@@ -17,6 +20,19 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+
+# **Debug OKX Installation and Structure**
+try:
+    pip_result = subprocess.check_output(["pip", "show", "okx"], text=True)
+    logging.info(f"pip show okx:\n{pip_result}")
+except subprocess.CalledProcessError as e:
+    logging.error(f"Failed to check okx installation: {e}")
+
+import okx
+logging.info(f"OKX module file: {okx.__file__}")
+logging.info(f"OKX module contents: {dir(okx)}")
+logging.info(f"Python executable: {sys.executable}")
+logging.info(f"Python path: {sys.path}")
 
 # **Security: Load Credentials**
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -84,7 +100,6 @@ trade = None
 
 # **Utility Functions**
 async def send_telegram_alert(message):
-    """Send a message to Telegram asynchronously."""
     try:
         logging.info(f"📩 Sending Telegram Alert: {message}")
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
@@ -92,7 +107,6 @@ async def send_telegram_alert(message):
         logging.error(f"⚠️ Failed to send Telegram alert: {e}")
 
 async def fetch_with_retries(api_call, max_attempts=3):
-    """Fetch data from OKX API with retries, handling synchronous calls asynchronously."""
     for attempt in range(max_attempts):
         try:
             response = await asyncio.to_thread(api_call)
@@ -109,7 +123,6 @@ async def fetch_with_retries(api_call, max_attempts=3):
 
 # **Trade Tracker**
 class TradeTracker:
-    """Track trade performance and calculate PnL."""
     def __init__(self):
         self.total_pnl = 0
         self.trade_count = 0
@@ -136,13 +149,11 @@ tracker = TradeTracker()
 
 # **State Management**
 def save_trade_state(trade, position_state):
-    """Save current trade state to a file."""
     state = {'position_state': position_state, 'trade': trade}
     with open("trade_state.json", 'w') as f:
         json.dump(state, f, default=str)
 
 def load_trade_state():
-    """Load trade state from file if it exists."""
     if os.path.exists("trade_state.json"):
         with open("trade_state.json", 'r') as f:
             state = json.load(f)
@@ -151,13 +162,11 @@ def load_trade_state():
     return None, None
 
 def clear_trade_state():
-    """Clear trade state file."""
     if os.path.exists("trade_state.json"):
         os.remove("trade_state.json")
 
 # **Indicator Calculations**
 def calculate_indicators(df, timeframe='4H'):
-    """Calculate technical indicators for the given dataframe."""
     if len(df) < ema_long_period:
         return df
     df['ema_short'] = ta.trend.ema_indicator(df['close'], window=ema_short_period)
@@ -171,7 +180,6 @@ def calculate_indicators(df, timeframe='4H'):
 
 # **Data Fetching**
 async def fetch_recent_data(timeframe='4H', limit='400'):
-    """Fetch recent candlestick data and calculate indicators."""
     response = await fetch_with_retries(
         lambda: market_api.get_candlesticks(instId=instId, bar=timeframe, limit=limit)
     )
@@ -184,7 +192,6 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
     return calculate_indicators(df, timeframe)
 
 async def get_current_price():
-    """Get the current market price."""
     response = await fetch_with_retries(
         lambda: market_api.get_ticker(instId=instId)
     )
@@ -192,7 +199,6 @@ async def get_current_price():
 
 # **Entry Logic**
 def check_entry(df_4h, df_15m):
-    """Check for trading signals based on 4H and 15m data."""
     if len(df_4h) < ema_long_period or len(df_15m) < ema_long_period:
         return None
 
@@ -225,7 +231,6 @@ def check_entry(df_4h, df_15m):
 
 # **Trading Functions**
 async def place_order(side, price, size_usdt):
-    """Place a market order on OKX."""
     global entry_atr
     size_sol = size_usdt / price
     size_contracts = max(round(size_sol / lot_size), 1)
@@ -244,7 +249,6 @@ async def place_order(side, price, size_usdt):
         return None, 0
 
 async def close_order(side, price, size_sol, exit_type=''):
-    """Close an existing position."""
     size_contracts = round(size_sol / lot_size)
     response = await asyncio.to_thread(
         trade_api.place_order,
@@ -261,7 +265,6 @@ async def close_order(side, price, size_sol, exit_type=''):
 
 # **Position Monitoring**
 async def monitor_position(position, entry_price, trade):
-    """Monitor an open position and manage exits."""
     global position_state, entry_atr
     size_sol = trade['size_sol']
     
@@ -325,15 +328,14 @@ async def monitor_position(position, entry_price, trade):
         await asyncio.sleep(10)
 
 # **Initialization**
-market_api = MarketData.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+market_api = MarketDataAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+trade_api = TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
 # **Main Function**
 async def main():
-    """Main trading loop."""
     global position_state, trade
     logging.info("✅ Script started successfully")
     print(startup_message)
