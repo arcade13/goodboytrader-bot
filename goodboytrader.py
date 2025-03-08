@@ -313,7 +313,7 @@ async def monitor_position(position, entry_price, trade):
                 return
         await asyncio.sleep(10)
 
-# ✅ Initialize OKX API Clients
+# ✅ Initialize OKX API Clients (NO `.MarketAPI`, `.TradeAPI`, or `.AccountAPI`)
 market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
