@@ -27,7 +27,7 @@ MarketAPI = Market
 TradeAPI = Trade
 AccountAPI = Account
 
-# Load Environment Variables (try both naming conventions)
+# Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY") or os.getenv("API_KEY")
 SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("SECRET_KEY")
 PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("PASSPHRASE")
@@ -43,7 +43,7 @@ print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHR
 
 # Validate credentials
 if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
-    raise ValueError("Missing API_KEY, SECRET_KEY, or PASSPHRASE. Check Render's Environment settings.")
+    raise ValueError("Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE. Check Render's Environment settings.")
 
 # Initialize OKX API clients
 market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
@@ -55,13 +55,29 @@ logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
 logging.info(f"Python executable: {sys.executable}")
 
-# Async main function with test
+# Async main function with debug and corrected API call
 async def main():
     logging.info("Bot is running...")
     try:
-        result = market_api.get_candlesticks(instId="BTC-USDT", bar="1m")
+        # Debug available MarketAPI methods
+        print("DEBUG - Available MarketAPI methods:", dir(market_api))
+        logging.info(f"DEBUG - Available MarketAPI methods: {dir(market_api)}")
+
+        # Try get_history_candlesticks (preferred method)
+        result = market_api.get_history_candlesticks(instId="BTC-USDT", bar="1m")
         logging.info(f"Candlesticks fetched: {json.dumps(result, indent=2)}")
         print("Candlesticks:", result)
+    except AttributeError as e:
+        logging.error(f"API Method Error: {str(e)}")
+        print(f"API Method Error: {str(e)}")
+        # Fallback to get_tickers to test connectivity
+        try:
+            result = market_api.get_tickers(instType="SPOT")
+            logging.info(f"Tickers fetched: {json.dumps(result, indent=2)}")
+            print("Tickers:", result)
+        except Exception as e2:
+            logging.error(f"Fallback API Error: {str(e2)}")
+            print(f"Fallback API Error: {str(e2)}")
     except Exception as e:
         logging.error(f"API Error: {str(e)}")
         print(f"API Error: {str(e)}")
