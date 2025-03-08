@@ -9,20 +9,19 @@ import okx
 import pkgutil
 
 print("OKX version:", okx.__version__)
-print("OKX path:", okx.__file__)
 print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
 
+# Try new imports
 try:
-    from okx.MarketData import MarketAPI
-    print("MarketAPI imported successfully")
-except ModuleNotFoundError as e:
-    print(f"Import failed: {e}")
+    from okx.api import MarketAPI, TradeAPI, AccountAPI
+    print("Imported MarketAPI, TradeAPI, AccountAPI from okx.api")
+except ImportError as e:
+    print(f"Import from okx.api failed: {e}")
 
-# Existing imports
-from okx.Trade import TradeAPI
-from okx.Account import AccountAPI
-# ... rest of your code ...
-
+# Rest of your code (remove old imports for now)
+# market_api = MarketAPI(api_key=..., ...)
+# trade_api = TradeAPI(...)
+# account_api = AccountAPI(...)
 from telegram import Bot
 import subprocess
 import sys
