@@ -183,38 +183,33 @@ def calculate_indicators(df, timeframe='4H'):
     df['atr_mean'] = df['atr'].rolling(14).mean()
     return df
 
-# Data Fetching (Updated to use get_candles)
+# Data Fetching (Updated with your fix)
 async def fetch_recent_data(timeframe='4H', limit='400'):
     print(f"DEBUG: Fetching {timeframe} data from OKX with limit={limit}")
     try:
-        response = await asyncio.wait_for(
-            asyncio.to_thread(  # Run synchronous API call in a thread
-                fetch_with_retries,
-                lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit, instType="SWAP")
-            ),
-            timeout=30
+        # ✅ Fix: Properly await fetch_with_retries directly
+        response = await fetch_with_retries(
+            lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit, instType="SWAP")
         )
-        print(f"DEBUG: Received response for {timeframe}: {response}")
     except asyncio.TimeoutError:
-        print(f"❌ ERROR: Timeout after 30s fetching {timeframe} data - main loop will retry")
-        logging.error(f"Timeout after 30s fetching {timeframe} data")
+        print(f"❌ ERROR: Timeout while fetching {timeframe} data! Retrying in 60s...")
+        logging.error(f"❌ Timeout while fetching {timeframe} data!")
         return pd.DataFrame()
     except Exception as e:
-        print(f"❌ ERROR: Failed fetching {timeframe} data: {e}")
-        logging.error(f"Exception in fetch_recent_data({timeframe}): {e}")
+        print(f"❌ ERROR: Exception while fetching {timeframe} data: {e}")
+        logging.error(f"❌ Exception in fetch_recent_data({timeframe}): {e}")
         return pd.DataFrame()
 
+    print(f"DEBUG: Received response for {timeframe}: {response}")  # Log full API response
+
     if not response:
-        print(f"❌ WARNING: Response is None for {timeframe} - main loop will retry")
-        logging.warning(f"Response is None for {timeframe}")
+        print(f"❌ ERROR: API response is None for {timeframe}! Double-check `instId` and API permissions.")
+        logging.error(f"❌ API response is None for {timeframe}. instId={instId}, instType=SWAP")
         return pd.DataFrame()
+    
     if 'code' in response and response['code'] != '0':
-        print(f"❌ ERROR: API error for {timeframe}: code={response['code']}, msg={response.get('msg', 'Unknown')}")
-        logging.error(f"API error for {timeframe}: {response}")
-        return pd.DataFrame()
-    if 'data' not in response or not response['data']:
-        print(f"❌ WARNING: No valid data in response for {timeframe}: {response}")
-        logging.warning(f"No valid data in response for {timeframe}: {response}")
+        print(f"❌ ERROR: OKX API Error: {response.get('msg', 'Unknown Error')}")
+        logging.error(f"❌ OKX API Error: {response}")
         return pd.DataFrame()
 
     print(f"✅ SUCCESS: Data received for {timeframe}, processing...")
@@ -281,6 +276,17 @@ async def close_order(side, price, size_sol, exit_type=''):
     else:
         logging.error(f"Close order failed: {response.get('msg', 'Unknown error')}")
         return False
+
+async def get_current_price():
+    try:
+        response = market_api.get_ticker(instId=instId)
+        if response['code'] == '0' and response['data']:
+            return float(response['data'][0]['last'])
+        logging.error(f"Failed to fetch price: {response.get('msg', 'Unknown error')}")
+        return None
+    except Exception as e:
+        logging.error(f"Error fetching price: {e}")
+        return None
 
 # Position Monitoring
 async def monitor_position(position, entry_price, trade):
