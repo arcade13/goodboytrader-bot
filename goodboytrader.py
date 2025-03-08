@@ -1,8 +1,8 @@
 import asyncio
 import os
 import json
+import sys  # Added for sys.executable
 import logging
-import requests
 from datetime import datetime
 import pandas as pd
 import ta
@@ -16,17 +16,19 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports (Script 2 style)
-from okx.api import Market, Trade, Account
+# OKX API Imports (Updated for v2.1.1)
+from okx import Market as MarketAPI
+from okx import Trade as TradeAPI
+from okx import Account as AccountAPI
 
-# Load Environment Variables (Script 2 style)
+# Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
 SECRET_KEY = os.getenv("OKX_SECRET_KEY")
 PASSPHRASE = os.getenv("OKX_PASSPHRASE")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# Validate Credentials (Script 2 style)
+# Validate Credentials
 if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
     raise ValueError("❌ Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE.")
 if not TELEGRAM_TOKEN:
@@ -34,29 +36,32 @@ if not TELEGRAM_TOKEN:
 if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("❌ CHAT_ID must be numeric.")
 
-# Convert CHAT_ID to integer (Script 2 style)
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API Clients (Script 2 style)
-market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+# Initialize OKX API Clients (Updated for v2.1.1)
+market_api = MarketAPI.MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+trade_api = TradeAPI.TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+account_api = AccountAPI.AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 
-# Initialize Telegram Bot (Script 2 style)
+# Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
 
-# Trading Parameters (Script 1)
-base_trade_size_usdt = 50   # Trade size in USDT
-leverage = 5               # Leverage from Script 1
+# Logging Environment Info
+logging.info(f"Python executable: {sys.executable}")
+logging.info(f"API_KEY loaded: {bool(API_KEY)}, SECRET_KEY loaded: {bool(SECRET_KEY)}, PASSPHRASE loaded: {bool(PASSPHRASE)}")
+
+# Trading Parameters
+base_trade_size_usdt = 50
+leverage = 5
 symbol = "SOL-USDT-SWAP"
 instId = "SOL-USDT-SWAP"
-lot_size = 0.1             # OKX contract size for SOL-USDT-SWAP
-SLIPPAGE = 0.002           # 0.2% slippage
-FEES = 0.00075             # 0.075% fees
-stop_loss_pct = 0.025      # 2.5% stop loss
-trailing_stop_factor = 1.8 # 1.8 × ATR trailing stop
+lot_size = 0.1
+SLIPPAGE = 0.002
+FEES = 0.00075
+stop_loss_pct = 0.025
+trailing_stop_factor = 1.8
 
-# Tunable Parameters (Script 1)
+# Tunable Parameters
 ema_short_period = 5
 ema_mid_period = 20
 ema_long_period = 100
@@ -65,7 +70,7 @@ rsi_short_threshold = 45
 adx_4h_threshold = 12
 adx_15m_threshold = 15
 
-# Startup Message (Script 1)
+# Startup Message
 startup_message = (
     f" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌\n"
     f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -78,12 +83,12 @@ startup_message = (
     f"📬 Notifications: Telegram to Chat ID {TELEGRAM_CHAT_ID}"
 )
 
-# Global State (Script 1)
+# Global State
 position_state = None
 entry_atr = 0
 trade = None
 
-# Utility Functions (Script 1 with Script 2's simpler Telegram approach)
+# Utility Functions
 async def send_telegram_alert(message):
     try:
         logging.info(f"📩 Sending Telegram Alert: {message}")
@@ -99,14 +104,13 @@ def fetch_with_retries(api_call, max_attempts=3):
                 raise Exception(f"API error: {response.get('msg', 'Unknown')}")
             return response
         except Exception as e:
-            error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
-            logging.error(error_msg)
+            logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_attempts - 1:
                 asyncio.sleep(5 * (attempt + 1))
             else:
                 return None
 
-# Trade Tracker (Script 1)
+# Trade Tracker
 class TradeTracker:
     def __init__(self):
         self.total_pnl = 0
@@ -132,7 +136,7 @@ class TradeTracker:
 
 tracker = TradeTracker()
 
-# State Management (Script 1)
+# State Management
 def save_trade_state(trade, position_state):
     state = {'position_state': position_state, 'trade': trade}
     with open("trade_state.json", 'w') as f:
@@ -150,7 +154,7 @@ def clear_trade_state():
     if os.path.exists("trade_state.json"):
         os.remove("trade_state.json")
 
-# Indicator Calculations (Script 1)
+# Indicator Calculations
 def calculate_indicators(df, timeframe='4H'):
     if len(df) < ema_long_period:
         return df
@@ -163,11 +167,11 @@ def calculate_indicators(df, timeframe='4H'):
     df['atr_mean'] = df['atr'].rolling(14).mean()
     return df
 
-# Data Fetching (Script 1)
+# Data Fetching (Updated to use get_candles)
 async def fetch_recent_data(timeframe='4H', limit='400'):
     response = await asyncio.to_thread(
         fetch_with_retries,
-        lambda: market_api.get_candlesticks(instId=instId, bar=timeframe, limit=limit)
+        lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
     )
     if not response or 'data' not in response:
         return pd.DataFrame()
@@ -184,22 +188,18 @@ async def get_current_price():
     )
     return float(response['data'][0]['last']) if response and 'data' in response else None
 
-# Entry Logic (Script 1)
+# Entry Logic
 def check_entry(df_4h, df_15m):
     if len(df_4h) < ema_long_period or len(df_15m) < ema_long_period:
         return None
-
     current_4h = df_4h.iloc[-1]
     current_15m = df_15m.iloc[-1]
-
     bearish_4h = (current_4h['close'] < current_4h['ema_short'] < current_4h['ema_mid'] < current_4h['ema_long'] and
                   current_4h['rsi'] < rsi_short_threshold and current_4h['adx'] >= adx_4h_threshold)
     bullish_4h = (current_4h['close'] > current_4h['ema_short'] > current_4h['ema_mid'] > current_4h['ema_long'] and
                   current_4h['rsi'] > rsi_long_threshold and current_4h['adx'] >= adx_4h_threshold)
-
     if not bearish_4h and not bullish_4h:
         return None
-
     if bearish_4h:
         bearish_15m = (current_15m['ema_short'] < current_15m['ema_mid'] < current_15m['ema_long'] and
                        current_15m['close'] < current_15m['ema_long'] and
@@ -214,7 +214,7 @@ def check_entry(df_4h, df_15m):
             return 'long'
     return None
 
-# Trading Functions (Script 1)
+# Trading Functions
 async def place_order(side, price, size_usdt):
     global entry_atr
     size_sol = size_usdt / price
@@ -248,11 +248,10 @@ async def close_order(side, price, size_sol, exit_type=''):
         logging.error(f"Close order failed: {response.get('msg', 'Unknown error')}")
         return False
 
-# Position Monitoring (Script 1)
+# Position Monitoring
 async def monitor_position(position, entry_price, trade):
     global position_state, entry_atr
     size_sol = trade['size_sol']
-    
     df_15m = await fetch_recent_data(timeframe='15m', limit='100')
     if df_15m.empty:
         return
@@ -263,25 +262,19 @@ async def monitor_position(position, entry_price, trade):
     atr_multiplier = 2.0 if entry_atr < atr_mean else 2.8
     tp2_price = entry_price + (entry_atr * atr_multiplier) if position == 'long' else entry_price - (entry_atr * atr_multiplier)
     sl_adjusted = False
-
     logging.info(f"SL: {stop_loss:.2f}, TP1: {tp1_price:.2f}, TP2: {tp2_price:.2f}, TSL Factor: {trailing_stop_factor} × ATR")
-
     while position_state == position:
         current_price = await get_current_price()
         if not current_price:
             await asyncio.sleep(5)
             continue
-
         current_price -= current_price * SLIPPAGE if position == 'long' else -current_price * SLIPPAGE
-
         trailing_sl = entry_price + (entry_atr * trailing_stop_factor) if position == 'long' else entry_price - (entry_atr * trailing_stop_factor)
-
         if not sl_adjusted and ((position == 'long' and current_price >= tp1_price) or (position == 'short' and current_price <= tp1_price)):
             sl_adjusted = True
             stop_loss = entry_price
             alert = f"🏆 Woo-hoo! {position.capitalize()} hit TP1 at {tp1_price:.2f} 🎯 SL now at breakeven {entry_price:.2f} 😎 Safe zone activated!"
             await send_telegram_alert(alert)
-
         if (position == 'long' and current_price <= stop_loss) or (position == 'short' and current_price >= stop_loss):
             if await close_order('sell' if position == 'long' else 'buy', current_price, size_sol, 'Stop Loss'):
                 trade['exit_time'], trade['exit_price'], trade['exit_type'] = datetime.now(), current_price, 'Stop Loss'
@@ -309,25 +302,21 @@ async def monitor_position(position, entry_price, trade):
                 position_state = None
                 clear_trade_state()
                 return
-
         await asyncio.sleep(10)
 
-# Initialization (Script 1)
+# Initialization
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
-# Main Function (Script 1 with Script 2's simpler startup)
+# Main Function
 async def main():
     global position_state, trade
     logging.info("✅ Bot Started Successfully!")
     await send_telegram_alert(startup_message)
-
-    # Load existing trade state
     position_state, trade = load_trade_state()
     if position_state:
         logging.info(f"Resuming existing {position_state} position from {trade['entry_time']}")
         asyncio.create_task(monitor_position(position_state, trade['entry_price'], trade))
-
     while True:
         try:
             logging.info("🔄 Checking for trade signals...")
@@ -337,13 +326,11 @@ async def main():
                 logging.warning("⚠️ Insufficient data, waiting...")
                 await asyncio.sleep(60)
                 continue
-
             entry_price = await get_current_price()
             if not entry_price:
                 logging.warning("⚠️ Failed to fetch current price, retrying...")
                 await asyncio.sleep(60)
                 continue
-
             if position_state is None:
                 signal = check_entry(df_4h, df_15m)
                 if signal in ['long', 'short']:
@@ -353,14 +340,12 @@ async def main():
                         position_state = signal
                         save_trade_state(trade, position_state)
                         asyncio.create_task(monitor_position(position_state, entry_price, trade))
-
             await asyncio.sleep(60)
         except Exception as e:
             logging.error(f"Main loop error: {str(e)}")
             await send_telegram_alert(f"🚨 Uh-oh! GoodBoyTrader hit a snag: {str(e)} 😵 Fixing it soon—stay tuned!")
             await asyncio.sleep(60)
 
-# Run the Bot (Script 2 style)
 if __name__ == "__main__":
     try:
         asyncio.run(main())
