@@ -21,16 +21,22 @@ from okx.api import Market
 from okx.api import Trade
 from okx.api import Account
 
-# Alias to match your existing code
+# Debug constructor args
+print("Market init args:", Market.__init__.__code__.co_varnames)
+
+# Alias to match your code
 MarketAPI = Market
 TradeAPI = Trade
 AccountAPI = Account
 
-# Initialize OKX API clients (update with your credentials)
-API_KEY = os.getenv("API_KEY")  # Load from .env
+# Load credentials
+API_KEY = os.getenv("API_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY")
 PASSPHRASE = os.getenv("PASSPHRASE")
+# Debug env vars (redact sensitive data in production)
+print("Env vars loaded:", "API_KEY" in os.environ, "SECRET_KEY" in os.environ, "PASSPHRASE" in os.environ)
 
+# Initialize OKX API clients
 market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 trade_api = TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
@@ -39,14 +45,10 @@ account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, 
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
 
-# ... rest of your bot logic ...
-# Example placeholder for your async trading logic
+# Async main function
 async def main():
-    # Add your trading logic here
     logging.info("Bot is running...")
-    # Example: Fetch market data
-    # result = market_api.get_candlesticks(instId="BTC-USDT", bar="1m")
-    # print(result)
+    # Add your trading logic here
 
 if __name__ == "__main__":
     asyncio.run(main())
