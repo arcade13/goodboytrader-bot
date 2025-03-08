@@ -176,22 +176,33 @@ def calculate_indicators(df, timeframe='4H'):
 
 # Data Fetching (Updated to use get_candles)
 async def fetch_recent_data(timeframe='4H', limit='400'):
-    response = await fetch_with_retries(  # Now async
-        lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
-    )
-    if not response or 'data' not in response:
+    print(f"DEBUG: Fetching {timeframe} data from OKX with limit={limit}")
+    try:
+        response = await asyncio.wait_for(
+            fetch_with_retries(lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)),
+            timeout=30  # 30s timeout
+        )
+        print(f"DEBUG: Received response for {timeframe}")
+    except asyncio.TimeoutError:
+        print(f"❌ ERROR: Timeout after 30s fetching {timeframe} data - main loop will retry")
+        logging.error(f"❌ Timeout after 30s fetching {timeframe} data")
         return pd.DataFrame()
+    except Exception as e:
+        print(f"❌ ERROR: Failed fetching {timeframe} data: {e}")
+        logging.error(f"❌ Exception in fetch_recent_data({timeframe}): {e}")
+        return pd.DataFrame()
+
+    if not response or 'data' not in response:
+        print(f"❌ WARNING: No data received for {timeframe} - main loop will retry")
+        logging.warning(f"❌ No data received for {timeframe}")
+        return pd.DataFrame()
+
+    print(f"✅ SUCCESS: Data received for {timeframe}, processing...")
     data = response['data'][::-1]
     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
     df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
     df[['open', 'high', 'low', 'close', 'vol']] = df[['open', 'high', 'low', 'close', 'vol']].astype(float)
     return calculate_indicators(df, timeframe)
-
-async def get_current_price():
-    response = await fetch_with_retries(  # Now async
-        lambda: market_api.get_ticker(instId=instId)
-    )
-    return float(response['data'][0]['last']) if response and 'data' in response else None
 
 # Entry Logic
 def check_entry(df_4h, df_15m):
