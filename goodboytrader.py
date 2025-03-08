@@ -5,13 +5,12 @@ import json
 import pandas as pd
 import ta
 from datetime import datetime
-from okx import MarketData as MarketDataAPI  # Import the class directly
-from okx import Trade as TradeAPI           # Import the class directly
-from okx import Account as AccountAPI       # Import the class directly
+from okx.MarketData import MarketAPI  # Correct class for market data
+from okx.Trade import TradeAPI        # Correct class for trading
+from okx.Account import AccountAPI    # Correct class for account operations
 from telegram import Bot
 import subprocess
 import sys
-import inspect
 
 # **Configure Logging**
 logging.basicConfig(
@@ -21,7 +20,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# **Debug OKX Installation and Structure**
+# **Debug OKX Installation**
 try:
     pip_result = subprocess.check_output(["pip", "show", "okx"], text=True)
     logging.info(f"pip show okx:\n{pip_result}")
@@ -29,8 +28,12 @@ except subprocess.CalledProcessError as e:
     logging.error(f"Failed to check okx installation: {e}")
 
 import okx
+logging.info(f"OKX version: {okx.__version__}")
 logging.info(f"OKX module file: {okx.__file__}")
 logging.info(f"OKX module contents: {dir(okx)}")
+logging.info(f"MarketAPI type: {type(MarketAPI)}")
+logging.info(f"TradeAPI type: {type(TradeAPI)}")
+logging.info(f"AccountAPI type: {type(AccountAPI)}")
 logging.info(f"Python executable: {sys.executable}")
 logging.info(f"Python path: {sys.path}")
 
@@ -328,7 +331,7 @@ async def monitor_position(position, entry_price, trade):
         await asyncio.sleep(10)
 
 # **Initialization**
-market_api = MarketDataAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+market_api = MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 trade_api = TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api = AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
 account_api.set_position_mode(posMode="long_short_mode")
