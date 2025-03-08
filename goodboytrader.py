@@ -1,9 +1,12 @@
 import asyncio
 import os
 import json
+import sys  # Added for sys.executable
 import logging
-import sys
-import requests
+from datetime import datetime
+import pandas as pd
+import ta
+from telegram import Bot
 
 # Configure Logging
 logging.basicConfig(
@@ -13,172 +16,52 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports
-from okx.api import Market
-from okx.api import Trade
-from okx.api import Account
-
-# Alias to match your code
-MarketAPI = Market
-TradeAPI = Trade
-AccountAPI = Account
+# OKX API Imports (Updated for v2.1.1)
+from okx import Market as MarketAPI
+from okx import Trade as TradeAPI
+from okx import Account as AccountAPI
 
 # Load Environment Variables
-API_KEY = os.getenv("OKX_API_KEY") or os.getenv("API_KEY")
-SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("SECRET_KEY")
-PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("PASSPHRASE")
+API_KEY = os.getenv("OKX_API_KEY")
+SECRET_KEY = os.getenv("OKX_SECRET_KEY")
+PASSPHRASE = os.getenv("OKX_PASSPHRASE")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# Debug environment variables
-print(f"DEBUG - API_KEY: {API_KEY}")
-print(f"DEBUG - SECRET_KEY: {SECRET_KEY}")
-print(f"DEBUG - PASSPHRASE: {PASSPHRASE}")
-print(f"DEBUG - CHAT_ID Type: {type(CHAT_ID)}, Value: {CHAT_ID}")
-logging.info(f"DEBUG - API_KEY: {API_KEY}")
-logging.info(f"DEBUG - SECRET_KEY: {SECRET_KEY[:4]}... (masked)")
-logging.info(f"DEBUG - PASSPHRASE: {PASSPHRASE[:4]}... (masked)")
-logging.info(f"DEBUG - CHAT_ID: {CHAT_ID}")
-print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None} {CHAT_ID is not None}")
-
-# Validate credentials and CHAT_ID
+# Validate Credentials
 if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
-    raise ValueError("Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE. Check Render's Environment settings.")
+    raise ValueError("❌ Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE.")
+if not TELEGRAM_TOKEN:
+    raise ValueError("❌ Missing TELEGRAM_TOKEN.")
 if not CHAT_ID or not CHAT_ID.strip().isdigit():
-    raise ValueError("CHAT_ID must be a numeric value. Check Render's Environment settings.")
+    raise ValueError("❌ CHAT_ID must be numeric.")
 
-# Convert CHAT_ID to integer
-CHAT_ID = int(CHAT_ID)
+TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API clients with correct base URL
-market_api = MarketAPI(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0',
-    base_api="https://www.okx.com"
-)
-trade_api = TradeAPI(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0',
-    base_api="https://www.okx.com"
-)
-account_api = AccountAPI(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0',
-    base_api="https://www.okx.com"
-)
+# Initialize OKX API Clients (Updated for v2.1.1)
+market_api = MarketAPI.MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+trade_api = TradeAPI.TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+account_api = AccountAPI.AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 
-# Bot Startup
-logging.info("Starting GoodBoyTrader...")
-print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-
-# Async main function with network test and corrected API call
-async def main():
-    logging.info("Bot is running...")
-    
-    # Test basic network connectivity to OKX
-    try:
-        response = requests.get("https://www.okx.com/api/v5/public/time")
-        print("DEBUG - OKX Public API Test:", response.json())
-        logging.info(f"DEBUG - OKX Public API Test: {response.json()}")
-    except requests.exceptions.RequestException as e:
-        print(f"DEBUG - OKX Connection Error: {e}")
-        logging.error(f"DEBUG - OKX Connection Error: {e}")
-
-    try:
-        # Debug available MarketAPI methods
-        print("DEBUG - Available MarketAPI methods:", dir(market_api))
-        logging.info(f"DEBUG - Available MarketAPI methods: {dir(market_api)}")
-
-        # Use get_candles for recent candlestick data
-        result = market_api.get_candles(instId="BTC-USDT", bar="1m")
-        logging.info(f"Candlesticks fetched: {json.dumps(result, indent=2)}")
-        print("Candlesticks:", result)
-    except AttributeError as e:
-        logging.error(f"API Method Error: {str(e)}")
-        print(f"API Method Error: {str(e)}")
-        # Fallback to get_tickers to test connectivity
-        try:
-            result = market_api.get_tickers(instType="SPOT")
-            logging.info(f"Tickers fetched: {json.dumps(result, indent=2)}")
-            print("Tickers:", result)
-        except Exception as e2:
-            logging.error(f"Fallback API Error: {str(e2)}")
-            print(f"Fallback API Error: {str(e2)}")
-    except Exception as e:
-        logging.error(f"API Error: {str(e)}")
-        print(f"API Error: {str(e)}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-# **Configure Logging**
-logging.basicConfig(
-    filename="goodboytrader.log",
-    filemode="a",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-
-# **Debug OKX Installation**
-try:
-    pip_result = subprocess.check_output(["pip", "show", "okx"], text=True)
-    logging.info(f"pip show okx:\n{pip_result}")
-except subprocess.CalledProcessError as e:
-    logging.error(f"Failed to check okx installation: {e}")
-
-import okx
-logging.info(f"OKX version: {okx.__version__}")
-logging.info(f"OKX module file: {okx.__file__}")
-logging.info(f"OKX module contents: {dir(okx)}")
-logging.info(f"MarketAPI type: {type(MarketAPI)}")
-logging.info(f"TradeAPI type: {type(TradeAPI)}")
-logging.info(f"AccountAPI type: {type(AccountAPI)}")
-logging.info(f"Python executable: {sys.executable}")
-logging.info(f"Python path: {sys.path}")
-
-# **Security: Load Credentials**
-API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
-SECRET_KEY = os.getenv('OKX_SECRET_KEY', 'your_okx_secret_key')
-PASSPHRASE = os.getenv('OKX_PASSPHRASE', 'your_okx_passphrase')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
-TELEGRAM_CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
-
-# **Validate Credentials**
-required_vars = {
-    'OKX_API_KEY': API_KEY,
-    'OKX_SECRET_KEY': SECRET_KEY,
-    'OKX_PASSPHRASE': PASSPHRASE,
-    'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
-    'CHAT_ID': TELEGRAM_CHAT_ID
-}
-for var_name, var_value in required_vars.items():
-    if var_name == 'CHAT_ID' and not var_value.isdigit() and var_value == f'your_{var_name.lower()}':
-        print(f"⚠️ Error: {var_name} must be a numeric chat ID or properly set.")
-        exit(1)
-    if var_value == f'your_{var_name.lower()}':
-        print(f"⚠️ Error: {var_name} not set in environment variables.")
-        exit(1)
-
-# **Initialize Telegram Bot**
+# Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
 
-# **Trading Parameters**
-base_trade_size_usdt = 50   # Trade size in USDT
-leverage = 5               # Leverage from backtest
+# Logging Environment Info
+logging.info(f"Python executable: {sys.executable}")
+logging.info(f"API_KEY loaded: {bool(API_KEY)}, SECRET_KEY loaded: {bool(SECRET_KEY)}, PASSPHRASE loaded: {bool(PASSPHRASE)}")
+
+# Trading Parameters
+base_trade_size_usdt = 50
+leverage = 5
 symbol = "SOL-USDT-SWAP"
 instId = "SOL-USDT-SWAP"
-lot_size = 0.1             # OKX contract size for SOL-USDT-SWAP
-SLIPPAGE = 0.002           # 0.2% slippage
-FEES = 0.00075             # 0.075% fees
-stop_loss_pct = 0.025      # 2.5% stop loss
-trailing_stop_factor = 1.8 # 1.8 × ATR trailing stop
+lot_size = 0.1
+SLIPPAGE = 0.002
+FEES = 0.00075
+stop_loss_pct = 0.025
+trailing_stop_factor = 1.8
 
-# **Tunable Parameters**
+# Tunable Parameters
 ema_short_period = 5
 ema_mid_period = 20
 ema_long_period = 100
@@ -187,7 +70,7 @@ rsi_short_threshold = 45
 adx_4h_threshold = 12
 adx_15m_threshold = 15
 
-# **Startup Message**
+# Startup Message
 startup_message = (
     f" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌\n"
     f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -200,12 +83,12 @@ startup_message = (
     f"📬 Notifications: Telegram to Chat ID {TELEGRAM_CHAT_ID}"
 )
 
-# **Global State**
+# Global State
 position_state = None
 entry_atr = 0
 trade = None
 
-# **Utility Functions**
+# Utility Functions
 async def send_telegram_alert(message):
     try:
         logging.info(f"📩 Sending Telegram Alert: {message}")
@@ -213,22 +96,21 @@ async def send_telegram_alert(message):
     except Exception as e:
         logging.error(f"⚠️ Failed to send Telegram alert: {e}")
 
-async def fetch_with_retries(api_call, max_attempts=3):
+def fetch_with_retries(api_call, max_attempts=3):
     for attempt in range(max_attempts):
         try:
-            response = await asyncio.to_thread(api_call)
+            response = api_call()
             if response['code'] != '0':
                 raise Exception(f"API error: {response.get('msg', 'Unknown')}")
             return response
         except Exception as e:
-            error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
-            logging.error(error_msg)
+            logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_attempts - 1:
-                await asyncio.sleep(5 * (attempt + 1))
+                asyncio.sleep(5 * (attempt + 1))
             else:
                 return None
 
-# **Trade Tracker**
+# Trade Tracker
 class TradeTracker:
     def __init__(self):
         self.total_pnl = 0
@@ -254,7 +136,7 @@ class TradeTracker:
 
 tracker = TradeTracker()
 
-# **State Management**
+# State Management
 def save_trade_state(trade, position_state):
     state = {'position_state': position_state, 'trade': trade}
     with open("trade_state.json", 'w') as f:
@@ -272,7 +154,7 @@ def clear_trade_state():
     if os.path.exists("trade_state.json"):
         os.remove("trade_state.json")
 
-# **Indicator Calculations**
+# Indicator Calculations
 def calculate_indicators(df, timeframe='4H'):
     if len(df) < ema_long_period:
         return df
@@ -285,12 +167,13 @@ def calculate_indicators(df, timeframe='4H'):
     df['atr_mean'] = df['atr'].rolling(14).mean()
     return df
 
-# **Data Fetching**
+# Data Fetching (Updated to use get_candles)
 async def fetch_recent_data(timeframe='4H', limit='400'):
-    response = await fetch_with_retries(
-        lambda: market_api.get_candlesticks(instId=instId, bar=timeframe, limit=limit)
+    response = await asyncio.to_thread(
+        fetch_with_retries,
+        lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
     )
-    if not response:
+    if not response or 'data' not in response:
         return pd.DataFrame()
     data = response['data'][::-1]
     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
@@ -299,44 +182,39 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
     return calculate_indicators(df, timeframe)
 
 async def get_current_price():
-    response = await fetch_with_retries(
+    response = await asyncio.to_thread(
+        fetch_with_retries,
         lambda: market_api.get_ticker(instId=instId)
     )
-    return float(response['data'][0]['last']) if response else None
+    return float(response['data'][0]['last']) if response and 'data' in response else None
 
-# **Entry Logic**
+# Entry Logic
 def check_entry(df_4h, df_15m):
     if len(df_4h) < ema_long_period or len(df_15m) < ema_long_period:
         return None
-
     current_4h = df_4h.iloc[-1]
     current_15m = df_15m.iloc[-1]
-
     bearish_4h = (current_4h['close'] < current_4h['ema_short'] < current_4h['ema_mid'] < current_4h['ema_long'] and
                   current_4h['rsi'] < rsi_short_threshold and current_4h['adx'] >= adx_4h_threshold)
     bullish_4h = (current_4h['close'] > current_4h['ema_short'] > current_4h['ema_mid'] > current_4h['ema_long'] and
                   current_4h['rsi'] > rsi_long_threshold and current_4h['adx'] >= adx_4h_threshold)
-
     if not bearish_4h and not bullish_4h:
         return None
-
     if bearish_4h:
         bearish_15m = (current_15m['ema_short'] < current_15m['ema_mid'] < current_15m['ema_long'] and
                        current_15m['close'] < current_15m['ema_long'] and
-                       current_15m['rsi'] < rsi_short_threshold and
-                       current_15m['adx'] >= adx_15m_threshold)
+                       current_15m['rsi'] < rsi_short_threshold and current_15m['adx'] >= adx_15m_threshold)
         if bearish_15m:
             return 'short'
     elif bullish_4h:
         bullish_15m = (current_15m['ema_short'] > current_15m['ema_mid'] > current_15m['ema_long'] and
                        current_15m['close'] > current_15m['ema_long'] and
-                       current_15m['rsi'] > rsi_long_threshold and
-                       current_15m['adx'] >= adx_15m_threshold)
+                       current_15m['rsi'] > rsi_long_threshold and current_15m['adx'] >= adx_15m_threshold)
         if bullish_15m:
             return 'long'
     return None
 
-# **Trading Functions**
+# Trading Functions
 async def place_order(side, price, size_usdt):
     global entry_atr
     size_sol = size_usdt / price
@@ -370,11 +248,10 @@ async def close_order(side, price, size_sol, exit_type=''):
         logging.error(f"Close order failed: {response.get('msg', 'Unknown error')}")
         return False
 
-# **Position Monitoring**
+# Position Monitoring
 async def monitor_position(position, entry_price, trade):
     global position_state, entry_atr
     size_sol = trade['size_sol']
-    
     df_15m = await fetch_recent_data(timeframe='15m', limit='100')
     if df_15m.empty:
         return
@@ -385,25 +262,19 @@ async def monitor_position(position, entry_price, trade):
     atr_multiplier = 2.0 if entry_atr < atr_mean else 2.8
     tp2_price = entry_price + (entry_atr * atr_multiplier) if position == 'long' else entry_price - (entry_atr * atr_multiplier)
     sl_adjusted = False
-
     logging.info(f"SL: {stop_loss:.2f}, TP1: {tp1_price:.2f}, TP2: {tp2_price:.2f}, TSL Factor: {trailing_stop_factor} × ATR")
-
     while position_state == position:
         current_price = await get_current_price()
         if not current_price:
             await asyncio.sleep(5)
             continue
-
         current_price -= current_price * SLIPPAGE if position == 'long' else -current_price * SLIPPAGE
-
         trailing_sl = entry_price + (entry_atr * trailing_stop_factor) if position == 'long' else entry_price - (entry_atr * trailing_stop_factor)
-
         if not sl_adjusted and ((position == 'long' and current_price >= tp1_price) or (position == 'short' and current_price <= tp1_price)):
             sl_adjusted = True
             stop_loss = entry_price
             alert = f"🏆 Woo-hoo! {position.capitalize()} hit TP1 at {tp1_price:.2f} 🎯 SL now at breakeven {entry_price:.2f} 😎 Safe zone activated!"
             await send_telegram_alert(alert)
-
         if (position == 'long' and current_price <= stop_loss) or (position == 'short' and current_price >= stop_loss):
             if await close_order('sell' if position == 'long' else 'buy', current_price, size_sol, 'Stop Loss'):
                 trade['exit_time'], trade['exit_price'], trade['exit_type'] = datetime.now(), current_price, 'Stop Loss'
@@ -431,29 +302,21 @@ async def monitor_position(position, entry_price, trade):
                 position_state = None
                 clear_trade_state()
                 return
-
         await asyncio.sleep(10)
 
-# **Initialization**
-market_api = MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-trade_api = TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-account_api = AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+# Initialization
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
-# **Main Function**
+# Main Function
 async def main():
     global position_state, trade
-    logging.info("✅ Script started successfully")
-    print(startup_message)
+    logging.info("✅ Bot Started Successfully!")
     await send_telegram_alert(startup_message)
-
-    # Load existing trade state
     position_state, trade = load_trade_state()
     if position_state:
         logging.info(f"Resuming existing {position_state} position from {trade['entry_time']}")
         asyncio.create_task(monitor_position(position_state, trade['entry_price'], trade))
-
     while True:
         try:
             logging.info("🔄 Checking for trade signals...")
@@ -463,13 +326,11 @@ async def main():
                 logging.warning("⚠️ Insufficient data, waiting...")
                 await asyncio.sleep(60)
                 continue
-
             entry_price = await get_current_price()
             if not entry_price:
                 logging.warning("⚠️ Failed to fetch current price, retrying...")
                 await asyncio.sleep(60)
                 continue
-
             if position_state is None:
                 signal = check_entry(df_4h, df_15m)
                 if signal in ['long', 'short']:
@@ -479,19 +340,14 @@ async def main():
                         position_state = signal
                         save_trade_state(trade, position_state)
                         asyncio.create_task(monitor_position(position_state, entry_price, trade))
-
             await asyncio.sleep(60)
         except Exception as e:
             logging.error(f"Main loop error: {str(e)}")
             await send_telegram_alert(f"🚨 Uh-oh! GoodBoyTrader hit a snag: {str(e)} 😵 Fixing it soon—stay tuned!")
             await asyncio.sleep(60)
 
-# **Run the Bot**
 if __name__ == "__main__":
     try:
-        print("Starting GoodBoyTrader...")
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n❌ Bot Stopped by User")
-    except Exception as e:
-        print(f"❌ Error starting bot: {str(e)}")
