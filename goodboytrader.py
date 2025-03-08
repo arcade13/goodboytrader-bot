@@ -187,9 +187,8 @@ def calculate_indicators(df, timeframe='4H'):
 async def fetch_recent_data(timeframe='4H', limit='400'):
     print(f"DEBUG: Fetching {timeframe} data from OKX with limit={limit}")
     try:
-        # ✅ Fix: Properly await fetch_with_retries directly
         response = await fetch_with_retries(
-            lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit, instType="SWAP")
+            lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
         )
     except asyncio.TimeoutError:
         print(f"❌ ERROR: Timeout while fetching {timeframe} data! Retrying in 60s...")
@@ -200,13 +199,11 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
         logging.error(f"❌ Exception in fetch_recent_data({timeframe}): {e}")
         return pd.DataFrame()
 
-    print(f"DEBUG: Received response for {timeframe}: {response}")  # Log full API response
-
+    print(f"DEBUG: Received response for {timeframe}: {response}")
     if not response:
         print(f"❌ ERROR: API response is None for {timeframe}! Double-check `instId` and API permissions.")
-        logging.error(f"❌ API response is None for {timeframe}. instId={instId}, instType=SWAP")
+        logging.error(f"❌ API response is None for {timeframe}. instId={instId}")
         return pd.DataFrame()
-    
     if 'code' in response and response['code'] != '0':
         print(f"❌ ERROR: OKX API Error: {response.get('msg', 'Unknown Error')}")
         logging.error(f"❌ OKX API Error: {response}")
