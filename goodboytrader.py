@@ -25,7 +25,7 @@ logging.info(f"OKX contents: {dir(okx)}")
 print(f"OKX SDK version: {okx.__version__}")
 print(f"OKX contents: {dir(okx)}")
 
-# ✅ Correct OKX API Imports (based on actual module structure)
+# ✅ Correct OKX API Imports
 from okx.api import Market
 from okx.api import Trade
 from okx.api import Account
@@ -313,7 +313,7 @@ async def monitor_position(position, entry_price, trade):
                 return
         await asyncio.sleep(10)
 
-# ✅ Initialize OKX API Clients Correctly
+# ✅ Initialize OKX API Clients
 market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
