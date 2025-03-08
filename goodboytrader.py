@@ -26,8 +26,9 @@ logging.basicConfig(
     level=logging.INFO
 )
 logging.info(f"OKX version: {okx.__version__}")
-logging.info(f"OKX contents: {dir(okx)}")
-from okx import MarketData as MarketAPI  # Try this first
+logging.info(f"OKX module contents: {dir(okx)}")
+# Temporary imports - we’ll fix these after seeing the logs
+from okx import MarketData as MarketAPI  # Keep this for now, expect it to fail
 from okx import Trade as TradeAPI
 from okx import Account as AccountAPI
 
