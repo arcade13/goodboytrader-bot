@@ -5,9 +5,9 @@ import json
 import pandas as pd
 import ta
 from datetime import datetime
-from okx.MarketData import MarketAPI  # Correct class for market data
-from okx.Trade import TradeAPI        # Correct class for trading
-from okx.Account import AccountAPI    # Correct class for account operations
+from okx import MarketAPI  # Import directly from okx
+from okx import TradeAPI   # For trading operations
+from okx import AccountAPI # For account operations
 from telegram import Bot
 import subprocess
 import sys
