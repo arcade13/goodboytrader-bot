@@ -1,128 +1,117 @@
-import sys
-import subprocess
-import os
-import pkgutil
-import logging
-import time
-import asyncio
 import pandas as pd
-import numpy as np
 import ta
 from datetime import datetime, timedelta
+import logging
+import numpy as np
 import json
-import telegram
-from dotenv import load_dotenv  # ✅ Import dotenv to load .env file
+import os
+import asyncio
+import time
+import okx.MarketData as MarketData
+import okx.Trade as Trade
+import okx.Account as Account
+import telegram  # For notifications
 
-# ✅ Load environment variables from .env
-load_dotenv()
-
-# ✅ Check Installed Modules
-installed_modules = [module.name for module in pkgutil.iter_modules()]
-print(f"Installed modules: {installed_modules}")
-
-# ✅ Try Installing OKX Module if Missing
-try:
-    import okx
-except ModuleNotFoundError:
-    print("⚠️ OKX module not found. Installing...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "okx"])
-    import okx
-
-# ✅ Verify OKX API Availability
-try:
-    from okx import api
-    print("✅ OKX API found:", dir(api))
-    MarketData = api.Market()
-    Trade = api.Trade()
-    Account = api.Account()
-except Exception as e:
-    print("⚠️ ERROR: Failed to import OKX API:", str(e))
-    exit(1)
-
-# ✅ Load API Keys & Credentials from .env
+# --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY')
 SECRET_KEY = os.getenv('OKX_SECRET_KEY')
 PASSPHRASE = os.getenv('OKX_PASSPHRASE')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 
-# ✅ DEBUG: Print which credentials are loaded
-print(f"OKX_API_KEY: {'✔' if API_KEY else '❌ MISSING'}")
-print(f"OKX_SECRET_KEY: {'✔' if SECRET_KEY else '❌ MISSING'}")
-print(f"OKX_PASSPHRASE: {'✔' if PASSPHRASE else '❌ MISSING'}")
-print(f"TELEGRAM_TOKEN: {'✔' if TELEGRAM_TOKEN else '❌ MISSING'}")
-print(f"CHAT_ID: {CHAT_ID if CHAT_ID and CHAT_ID.isdigit() else '❌ INVALID CHAT ID'}")
+# --- Initialize APIs ---
+market_api = MarketData.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api.set_position_mode(posMode="long_short_mode")
+account_api.set_leverage(instId="SOL-USDT-SWAP", lever="5", mgnMode="cross")
 
-# ✅ VALIDATE CREDENTIALS
-missing_vars = [var for var, value in {
-    'OKX_API_KEY': API_KEY, 
-    'OKX_SECRET_KEY': SECRET_KEY, 
-    'OKX_PASSPHRASE': PASSPHRASE, 
-    'TELEGRAM_TOKEN': TELEGRAM_TOKEN, 
-    'CHAT_ID': CHAT_ID
-}.items() if not value]
+# --- Trading Parameters ---
+trade_size_usdt = 50  # Fixed 50 USDT per trade
+leverage = 5  # 5x leverage
+symbol = "SOL-USDT-SWAP"
+lot_size = 0.1  # OKX contract size
+SLIPPAGE = 0.002
+FEES = 0.00075
+stop_loss_pct = 0.025
+trailing_stop_factor = 1.8
 
-if missing_vars:
-    print(f"⚠️ ERROR: Missing environment variables: {', '.join(missing_vars)}")
-    exit(1)
+# --- Indicators Configuration ---
+ema_short_period = 5
+ema_mid_period = 20
+ema_long_period = 100
+rsi_long_threshold = 55
+rsi_short_threshold = 45
+adx_4h_threshold = 12
+adx_15m_threshold = 15
 
-# ✅ Initialize Telegram Bot
+# --- Logging ---
+logging.basicConfig(filename='goodboytrader.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- Telegram Bot ---
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
-
-# ✅ Logging Setup
-logging.basicConfig(filename='okx_trading_bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# ✅ Fetch Data Function
-def fetch_recent_data(timeframe='4H', limit='400'):
+async def send_telegram_alert(message):
     try:
-        response = MarketData.get_candles(instId="SOL-USDT-SWAP", bar=timeframe, limit=limit)
-        if response['code'] != '0':
-            raise Exception(f"API error: {response.get('msg', 'Unknown')}")
-        
-        data = response['data'][::-1]  # Reverse order for chronological data
-        df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
-        df[['open', 'high', 'low', 'close', 'vol']] = df[['open', 'high', 'low', 'close', 'vol']].astype(float)
-        return df
+        await bot.send_message(chat_id=CHAT_ID, text=message)
     except Exception as e:
-        print(f"⚠️ Error fetching data: {e}")
+        logging.error(f"Telegram Error: {str(e)}")
+
+# --- Data Fetching ---
+def fetch_data(timeframe='4H', limit='400'):
+    response = market_api.get_candlesticks(instId=symbol, bar=timeframe, limit=limit)
+    if response['code'] != '0':
         return pd.DataFrame()
+    df = pd.DataFrame(response['data'][::-1], columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
+    df[['open', 'high', 'low', 'close']] = df[['open', 'high', 'low', 'close']].astype(float)
+    return df
 
-# ✅ Get Current Price Function
-def get_current_price():
-    try:
-        response = MarketData.get_ticker(instId="SOL-USDT-SWAP")
-        if response['code'] == '0':
-            return float(response['data'][0]['last'])
-        else:
-            print(f"⚠️ API Error: {response.get('msg', 'Unknown')}")
-            return None
-    except Exception as e:
-        print(f"⚠️ Failed to fetch price: {e}")
+# --- Indicator Calculation ---
+def calculate_indicators(df):
+    if len(df) < ema_long_period:
+        return df
+    df['ema_short'] = ta.trend.ema_indicator(df['close'], window=ema_short_period)
+    df['ema_mid'] = ta.trend.ema_indicator(df['close'], window=ema_mid_period)
+    df['ema_long'] = ta.trend.ema_indicator(df['close'], window=ema_long_period)
+    df['rsi'] = ta.momentum.rsi(df['close'], window=14)
+    df['adx'] = ta.trend.adx(df['high'], df['low'], df['close'], window=14)
+    df['atr'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)
+    df['atr_mean'] = df['atr'].rolling(14).mean()
+    return df
+
+# --- Trading Logic ---
+def check_entry(df_4h, df_15m):
+    if len(df_4h) < ema_long_period or len(df_15m) < ema_long_period:
         return None
 
-# ✅ Main Loop
+    bullish_4h = (df_4h.iloc[-1]['close'] > df_4h.iloc[-1]['ema_short'] > df_4h.iloc[-1]['ema_mid'] > df_4h.iloc[-1]['ema_long'] and df_4h.iloc[-1]['rsi'] > rsi_long_threshold and df_4h.iloc[-1]['adx'] >= adx_4h_threshold)
+    bearish_4h = (df_4h.iloc[-1]['close'] < df_4h.iloc[-1]['ema_short'] < df_4h.iloc[-1]['ema_mid'] < df_4h.iloc[-1]['ema_long'] and df_4h.iloc[-1]['rsi'] < rsi_short_threshold and df_4h.iloc[-1]['adx'] >= adx_4h_threshold)
+    
+    bullish_15m = (df_15m.iloc[-1]['ema_short'] > df_15m.iloc[-1]['ema_mid'] > df_15m.iloc[-1]['ema_long'] and df_15m.iloc[-1]['close'] > df_15m.iloc[-1]['ema_long'] and df_15m.iloc[-1]['rsi'] > rsi_long_threshold and df_15m.iloc[-1]['adx'] >= adx_15m_threshold)
+    bearish_15m = (df_15m.iloc[-1]['ema_short'] < df_15m.iloc[-1]['ema_mid'] < df_15m.iloc[-1]['ema_long'] and df_15m.iloc[-1]['close'] < df_15m.iloc[-1]['ema_long'] and df_15m.iloc[-1]['rsi'] < rsi_short_threshold and df_15m.iloc[-1]['adx'] >= adx_15m_threshold)
+    
+    if bullish_4h and bullish_15m:
+        return 'long'
+    if bearish_4h and bearish_15m:
+        return 'short'
+    return None
+
+# --- Main Loop ---
 while True:
     try:
-        df_4h = fetch_recent_data(timeframe='4H', limit='400')
-        df_15m = fetch_recent_data(timeframe='15m', limit='100')
-
+        df_4h = calculate_indicators(fetch_data('4H', '400'))
+        df_15m = calculate_indicators(fetch_data('15m', '100'))
+        
         if df_4h.empty or df_15m.empty:
-            print("⚠️ Insufficient data, retrying...")
             time.sleep(60)
             continue
 
-        price = get_current_price()
-        if price is None:
-            time.sleep(60)
-            continue
+        entry_signal = check_entry(df_4h, df_15m)
+        if entry_signal:
+            asyncio.run(send_telegram_alert(f'📢 New {entry_signal.upper()} signal detected!'))
 
-        print(f"✅ Current SOL/USDT price: {price}")
-        time.sleep(60)
-
+        time.sleep(60)  # Run every minute
     except Exception as e:
-        print(f"⚠️ Main loop error: {str(e)}")
-        logging.error(f"Main loop error: {str(e)}")
-        asyncio.run(bot.send_message(chat_id=CHAT_ID, text=f"🚨 Bot error: {str(e)}"))
+        logging.error(f"Error: {str(e)}")
         time.sleep(60)
 
