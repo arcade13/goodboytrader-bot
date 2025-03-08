@@ -1,117 +1,82 @@
-import time
 import logging
-import requests
-import json
 import asyncio
-from datetime import datetime
-from okx.api import Market, Trade
+import requests
 from telegram import Bot
 
-# -------------------- CONFIGURATION -------------------- #
-API_KEY = "your_okx_api_key"
-SECRET_KEY = "your_okx_secret_key"
-PASSPHRASE = "your_okx_passphrase"
-SYMBOL = "SOL-USDT-SWAP"
-
-# Telegram Bot Config
-TELEGRAM_BOT_TOKEN = "your_telegram_bot_token"
-TELEGRAM_CHAT_ID = "your_chat_id"
-
-# Logging Setup
+# ✅ CONFIGURE LOGGING
 logging.basicConfig(
     filename="goodboytrader.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
 )
 
-# Initialize APIs
-market_api = Market()  # No authentication needed for market data
-trade_api = Trade()  # No authentication during initialization
-
+# ✅ TELEGRAM CONFIG
+TELEGRAM_BOT_TOKEN = "your_actual_telegram_bot_token"  # Replace with actual bot token
+TELEGRAM_CHAT_ID = "your_chat_id"  # Replace with actual chat ID
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
-
-# -------------------- HELPER FUNCTIONS -------------------- #
-async def send_telegram_message(message):
-    """Send alerts to Telegram (async)"""
+# ✅ SEND TELEGRAM MESSAGE FUNCTION (Handles event loop issues)
+async def send_telegram_alert(message):
     try:
+        logging.info(f"📩 Sending Telegram Alert: {message}")
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-        logging.info(f"Telegram Alert Sent: {message}")
     except Exception as e:
-        logging.error(f"Failed to send Telegram alert: {str(e)}")
+        logging.error(f"⚠️ Failed to send Telegram alert: {e}")
 
-
-def fetch_recent_data(timeframe="4H", limit=100):
-    """Fetch market data from OKX API."""
+# ✅ FUNCTION TO FETCH OKX DATA
+def fetch_okx_data(timeframe="4H"):
     try:
-        response = market_api.get_candles(instId=SYMBOL, bar=timeframe, limit=str(limit))
-        if response.get("code") == "0":
-            logging.info(f"✅ Successfully fetched {timeframe} data")
-            return response["data"]
+        url = "https://www.okx.com/api/v5/market/candles"
+        params = {"instId": "SOL-USDT-SWAP", "bar": timeframe, "limit": "100"}
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        if data["code"] == "0":
+            return data["data"]
         else:
-            logging.error(f"❌ Failed to fetch {timeframe} data: {response}")
-            asyncio.run(send_telegram_message(f"⚠️ Error fetching market data: {response}"))
+            logging.error(f"⚠️ OKX API Error: {data}")
             return None
     except requests.exceptions.RequestException as e:
-        logging.error(f"Data fetch failed: {str(e)}")
-        asyncio.run(send_telegram_message(f"⚠️ Error fetching market data: {str(e)}"))
+        logging.error(f"⚠️ Data fetch failed: {e}")
+        asyncio.create_task(send_telegram_alert(f"⚠️ Error fetching market data: {e}"))
         return None
 
+# ✅ CHECK FOR TRADE SIGNALS
+def check_trade_signal():
+    data_4h = fetch_okx_data("4H")
+    data_15m = fetch_okx_data("15m")
 
-def calculate_indicators(data):
-    """Basic processing of market data"""
-    if not data:
+    if not data_4h or not data_15m:
+        logging.warning("⚠️ No market data available, retrying...")
         return None
-    return data  # Placeholder - Replace with actual indicator calculations
 
+    # ✅ Implement your trading logic here
+    trade_signal = "BUY" if float(data_15m[0][1]) > float(data_4h[0][1]) else "SELL"
+    return trade_signal
 
-def execute_trade(side, size="50"):
-    """Place an order on OKX"""
-    try:
-        order_data = {
-            "apiKey": API_KEY,
-            "secretKey": SECRET_KEY,
-            "passphrase": PASSPHRASE,
-            "instId": SYMBOL,
-            "tdMode": "cross",
-            "side": side,
-            "ordType": "market",
-            "sz": size
-        }
-        response = trade_api.set_order(**order_data)
+# ✅ MAIN FUNCTION (No asyncio.run() conflict)
+async def main():
+    logging.info("✅ Script started successfully")
+    print("🚀 GoodBoyTrader Bot Starting...")
 
-        if response.get("code") == "0":
-            logging.info(f"✅ Trade Executed: {side.upper()} - Size: {size}")
-            asyncio.run(send_telegram_message(f"✅ Trade Executed: {side.upper()} - Size: {size}"))
-        else:
-            logging.error(f"❌ Trade Execution Failed: {response}")
-            asyncio.run(send_telegram_message(f"⚠️ Trade Failed: {response}"))
+    while True:
+        logging.info("🔄 Checking for trade signals...")
+        trade_signal = check_trade_signal()
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Trade execution failed: {str(e)}")
-        asyncio.run(send_telegram_message(f"⚠️ Error executing trade: {str(e)}"))
-
-
-# -------------------- MAIN BOT LOGIC -------------------- #
-logging.info("🚀 GoodBoyTrader Bot Starting...")
-asyncio.run(send_telegram_message("🚀 GoodBoyTrader Bot Started!"))
-
-while True:
-    logging.info("🔄 Checking for trade signals...")
-    
-    df_4h = calculate_indicators(fetch_recent_data("4H"))
-    df_15m = calculate_indicators(fetch_recent_data("15m"))
-
-    if df_4h and df_15m:
-        # Dummy trade condition (Replace with your actual strategy)
-        if float(df_15m[0][1]) > float(df_4h[0][1]):
-            execute_trade("buy")
-        elif float(df_15m[0][1]) < float(df_4h[0][1]):
-            execute_trade("sell")
+        if trade_signal:
+            message = f"📊 Trade Signal: {trade_signal}"
+            logging.info(message)
+            await send_telegram_alert(message)  # ✅ Await inside async function
         else:
             logging.info("⏳ No trade signal detected, waiting...")
-    else:
-        logging.warning("⚠️ No data available, retrying...")
 
-    time.sleep(60)  # Wait before next check
+        await asyncio.sleep(60)  # ✅ Proper async sleep without conflict
+
+# ✅ RUN MAIN ASYNC FUNCTION SAFELY
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())  # ✅ Now runs safely without conflicts
+    except KeyboardInterrupt:
+        print("\n❌ Bot Stopped by User")
 
