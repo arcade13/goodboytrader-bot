@@ -7,7 +7,7 @@ import time
 import asyncio
 import telegram
 from datetime import datetime
-from okx.api import Market, Trade, Account  # ✅ Fixed OKX imports
+from okx.api import Market, Trade, Account  # ✅ Corrected import
 
 # --- Security: Load credentials ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -30,10 +30,10 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 # --- Logging Setup ---
 logging.basicConfig(filename='goodboytrader.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- OKX API Initialization ---
-market_api = Market(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
-trade_api = Trade(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
-account_api = Account(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
+# --- ✅ FIXED: OKX API Initialization ---
+market_api = Market()  # ✅ Corrected
+trade_api = Trade()    # ✅ Corrected
+account_api = Account()  # ✅ Corrected
 
 # --- Trading Parameters ---
 symbol = "SOL-USDT-SWAP"
