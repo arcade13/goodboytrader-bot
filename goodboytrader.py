@@ -1,4 +1,3 @@
-import logging
 import asyncio
 import os
 import json
@@ -28,8 +27,12 @@ try:
 except ModuleNotFoundError as e:
     print(f"MarketData import failed: {e}")
 
-# Rest of your code (comment out if needed for now)
 import logging
+
+from okx.api.market import MarketAPI
+from okx.api.trade import TradeAPI
+from okx.api.account import AccountAPI
+
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
 # ... rest of your bot logic ...
