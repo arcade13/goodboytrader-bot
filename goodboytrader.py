@@ -8,7 +8,7 @@ import ta
 from telegram import Bot
 
 # OKX API Imports (Debugging)
-import logging  # Moved up
+import logging
 import okx
 
 # Configure Logging
@@ -25,7 +25,7 @@ logging.info(f"OKX contents: {dir(okx)}")
 print(f"OKX SDK version: {okx.__version__}")
 print(f"OKX contents: {dir(okx)}")
 
-# ✅ Correct OKX API Imports (ensure these are at the top)
+# ✅ Correct OKX API Imports
 from okx.api import Market, Trade, Account
 
 # Load Environment Variables
@@ -45,7 +45,7 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
 
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# ✅ Initialize OKX API Clients (NO `.MarketAPI`, `.TradeAPI`, or `.AccountAPI`)
+# ✅ Initialize OKX API Clients
 market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
@@ -103,7 +103,7 @@ async def send_telegram_alert(message):
     except Exception as e:
         logging.error(f"⚠️ Failed to send Telegram alert: {e}")
 
-def fetch_with_retries(api_call, max_attempts=3):
+async def fetch_with_retries(api_call, max_attempts=3):  # Now async
     for attempt in range(max_attempts):
         try:
             response = api_call()
@@ -113,7 +113,7 @@ def fetch_with_retries(api_call, max_attempts=3):
         except Exception as e:
             logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_attempts - 1:
-                asyncio.sleep(5 * (attempt + 1))
+                await asyncio.sleep(5 * (attempt + 1))  # Fixed with await
             else:
                 return None
 
@@ -176,8 +176,7 @@ def calculate_indicators(df, timeframe='4H'):
 
 # Data Fetching (Updated to use get_candles)
 async def fetch_recent_data(timeframe='4H', limit='400'):
-    response = await asyncio.to_thread(
-        fetch_with_retries,
+    response = await fetch_with_retries(  # Now async
         lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
     )
     if not response or 'data' not in response:
@@ -189,8 +188,7 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
     return calculate_indicators(df, timeframe)
 
 async def get_current_price():
-    response = await asyncio.to_thread(
-        fetch_with_retries,
+    response = await fetch_with_retries(  # Now async
         lambda: market_api.get_ticker(instId=instId)
     )
     return float(response['data'][0]['last']) if response and 'data' in response else None
@@ -226,8 +224,7 @@ async def place_order(side, price, size_usdt):
     global entry_atr
     size_sol = size_usdt / price
     size_contracts = max(round(size_sol / lot_size), 1)
-    response = await asyncio.to_thread(
-        trade_api.place_order,
+    response = await trade_api.place_order(  # Already async
         instId=instId, tdMode='cross', side='buy' if side == 'long' else 'sell',
         posSide=side, ordType='market', sz=str(size_contracts)
     )
@@ -242,8 +239,7 @@ async def place_order(side, price, size_usdt):
 
 async def close_order(side, price, size_sol, exit_type=''):
     size_contracts = round(size_sol / lot_size)
-    response = await asyncio.to_thread(
-        trade_api.place_order,
+    response = await trade_api.place_order(  # Already async
         instId=instId, tdMode='cross', side=side,
         posSide='long' if side == 'sell' else 'short',
         ordType='market', sz=str(size_contracts)
