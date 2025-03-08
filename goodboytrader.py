@@ -1,14 +1,120 @@
-import logging
 import asyncio
 import os
 import json
-import pandas as pd
-import ta
-from datetime import datetime
-import okx.MarketData as MarketData
-import okx.Trade as Trade
-import okx.Account as Account
-from telegram import Bot
+import logging
+import sys
+import requests
+
+# Configure Logging
+logging.basicConfig(
+    filename="goodboytrader.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+
+# OKX API Imports
+from okx.api import Market
+from okx.api import Trade
+from okx.api import Account
+
+# Alias to match your code
+MarketAPI = Market
+TradeAPI = Trade
+AccountAPI = Account
+
+# Load Environment Variables
+API_KEY = os.getenv("OKX_API_KEY") or os.getenv("API_KEY")
+SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("SECRET_KEY")
+PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("PASSPHRASE")
+CHAT_ID = os.getenv("CHAT_ID")
+
+# Debug environment variables
+print(f"DEBUG - API_KEY: {API_KEY}")
+print(f"DEBUG - SECRET_KEY: {SECRET_KEY}")
+print(f"DEBUG - PASSPHRASE: {PASSPHRASE}")
+print(f"DEBUG - CHAT_ID Type: {type(CHAT_ID)}, Value: {CHAT_ID}")
+logging.info(f"DEBUG - API_KEY: {API_KEY}")
+logging.info(f"DEBUG - SECRET_KEY: {SECRET_KEY[:4]}... (masked)")
+logging.info(f"DEBUG - PASSPHRASE: {PASSPHRASE[:4]}... (masked)")
+logging.info(f"DEBUG - CHAT_ID: {CHAT_ID}")
+print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None} {CHAT_ID is not None}")
+
+# Validate credentials and CHAT_ID
+if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
+    raise ValueError("Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE. Check Render's Environment settings.")
+if not CHAT_ID or not CHAT_ID.strip().isdigit():
+    raise ValueError("CHAT_ID must be a numeric value. Check Render's Environment settings.")
+
+# Convert CHAT_ID to integer
+CHAT_ID = int(CHAT_ID)
+
+# Debug MarketAPI constructor parameters
+print("DEBUG - MarketAPI init args:", MarketAPI.__init__.__code__.co_varnames)
+
+# Initialize OKX API clients without base_api
+market_api = MarketAPI(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0'
+)
+trade_api = TradeAPI(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0'
+)
+account_api = AccountAPI(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0'
+)
+
+# Bot Startup
+logging.info("Starting GoodBoyTrader...")
+print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
+
+# Async main function with network test and corrected API call
+async def main():
+    logging.info("Bot is running...")
+    
+    # Test basic network connectivity to OKX
+    try:
+        response = requests.get("https://www.okx.com/api/v5/public/time")
+        print("DEBUG - OKX Public API Test:", response.json())
+        logging.info(f"DEBUG - OKX Public API Test: {response.json()}")
+    except requests.exceptions.RequestException as e:
+        print(f"DEBUG - OKX Connection Error: {e}")
+        logging.error(f"DEBUG - OKX Connection Error: {e}")
+
+    try:
+        # Debug available MarketAPI methods
+        print("DEBUG - Available MarketAPI methods:", dir(market_api))
+        logging.info(f"DEBUG - Available MarketAPI methods: {dir(market_api)}")
+
+        # Use get_candles for recent candlestick data
+        result = market_api.get_candles(instId="BTC-USDT", bar="1m")
+        logging.info(f"Candlesticks fetched: {json.dumps(result, indent=2)}")
+        print("Candlesticks:", result)
+    except AttributeError as e:
+        logging.error(f"API Method Error: {str(e)}")
+        print(f"API Method Error: {str(e)}")
+        # Fallback to get_tickers to test connectivity
+        try:
+            result = market_api.get_tickers(instType="SPOT")
+            logging.info(f"Tickers fetched: {json.dumps(result, indent=2)}")
+            print("Tickers:", result)
+        except Exception as e2:
+            logging.error(f"Fallback API Error: {str(e2)}")
+            print(f"Fallback API Error: {str(e2)}")
+    except Exception as e:
+        logging.error(f"API Error: {str(e)}")
+        print(f"API Error: {str(e)}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
 # **Configure Logging**
 logging.basicConfig(
