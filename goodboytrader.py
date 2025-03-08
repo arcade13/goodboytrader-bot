@@ -17,9 +17,9 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
 CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
 
 # --- Initialize OKX APIs ---
-trade_api = Trade(api_key=API_KEY, api_secret=SECRET_KEY, passphrase=PASSPHRASE)
-market_api = Market(api_key=API_KEY, api_secret=SECRET_KEY, passphrase=PASSPHRASE)
-account_api = Account(api_key=API_KEY, api_secret=SECRET_KEY, passphrase=PASSPHRASE)
+trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE)
+market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE)
+account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE)
 
 # --- Logging Setup ---
 logging.basicConfig(filename='goodboytrader.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
