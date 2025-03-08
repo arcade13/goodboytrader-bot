@@ -4,6 +4,10 @@ import json
 import logging
 import sys
 import requests
+from datetime import datetime
+import pandas as pd
+import ta
+from telegram import Bot
 
 # Configure Logging
 logging.basicConfig(
@@ -27,130 +31,42 @@ AccountAPI = Account
 API_KEY = os.getenv("OKX_API_KEY") or os.getenv("API_KEY")
 SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("SECRET_KEY")
 PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("PASSPHRASE")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 # Debug environment variables
 print(f"DEBUG - API_KEY: {API_KEY}")
 print(f"DEBUG - SECRET_KEY: {SECRET_KEY}")
 print(f"DEBUG - PASSPHRASE: {PASSPHRASE}")
+print(f"DEBUG - TELEGRAM_TOKEN: {TELEGRAM_TOKEN}")
 print(f"DEBUG - CHAT_ID Type: {type(CHAT_ID)}, Value: {CHAT_ID}")
 logging.info(f"DEBUG - API_KEY: {API_KEY}")
 logging.info(f"DEBUG - SECRET_KEY: {SECRET_KEY[:4]}... (masked)")
 logging.info(f"DEBUG - PASSPHRASE: {PASSPHRASE[:4]}... (masked)")
+logging.info(f"DEBUG - TELEGRAM_TOKEN: {TELEGRAM_TOKEN[:4]}... (masked)" if TELEGRAM_TOKEN else "DEBUG - TELEGRAM_TOKEN: None")
 logging.info(f"DEBUG - CHAT_ID: {CHAT_ID}")
-print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None} {CHAT_ID is not None}")
+print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None} {TELEGRAM_TOKEN is not None} {CHAT_ID is not None}")
 
-# Validate credentials and CHAT_ID
+# Validate credentials
 if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
     raise ValueError("Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE. Check Render's Environment settings.")
+if not TELEGRAM_TOKEN:
+    raise ValueError("Missing TELEGRAM_TOKEN. Check Render's Environment settings.")
 if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("CHAT_ID must be a numeric value. Check Render's Environment settings.")
 
 # Convert CHAT_ID to integer
-CHAT_ID = int(CHAT_ID)
+TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Debug MarketAPI constructor parameters
-print("DEBUG - MarketAPI init args:", MarketAPI.__init__.__code__.co_varnames)
+# Initialize OKX API clients
+market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+trade_api = TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 
-# Initialize OKX API clients without base_api
-market_api = MarketAPI(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0'
-)
-trade_api = TradeAPI(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0'
-)
-account_api = AccountAPI(
-    key=API_KEY,
-    secret=SECRET_KEY,
-    passphrase=PASSPHRASE,
-    flag='0'
-)
-
-# Bot Startup
-logging.info("Starting GoodBoyTrader...")
-print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-
-# Async main function with network test and corrected API call
-async def main():
-    logging.info("Bot is running...")
-    
-    # Test basic network connectivity to OKX
-    try:
-        response = requests.get("https://www.okx.com/api/v5/public/time")
-        print("DEBUG - OKX Public API Test:", response.json())
-        logging.info(f"DEBUG - OKX Public API Test: {response.json()}")
-    except requests.exceptions.RequestException as e:
-        print(f"DEBUG - OKX Connection Error: {e}")
-        logging.error(f"DEBUG - OKX Connection Error: {e}")
-
-    try:
-        # Debug available MarketAPI methods
-        print("DEBUG - Available MarketAPI methods:", dir(market_api))
-        logging.info(f"DEBUG - Available MarketAPI methods: {dir(market_api)}")
-
-        # Use get_candles for recent candlestick data
-        result = market_api.get_candles(instId="BTC-USDT", bar="1m")
-        logging.info(f"Candlesticks fetched: {json.dumps(result, indent=2)}")
-        print("Candlesticks:", result)
-    except AttributeError as e:
-        logging.error(f"API Method Error: {str(e)}")
-        print(f"API Method Error: {str(e)}")
-        # Fallback to get_tickers to test connectivity
-        try:
-            result = market_api.get_tickers(instType="SPOT")
-            logging.info(f"Tickers fetched: {json.dumps(result, indent=2)}")
-            print("Tickers:", result)
-        except Exception as e2:
-            logging.error(f"Fallback API Error: {str(e2)}")
-            print(f"Fallback API Error: {str(e2)}")
-    except Exception as e:
-        logging.error(f"API Error: {str(e)}")
-        print(f"API Error: {str(e)}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-# **Configure Logging**
-logging.basicConfig(
-    filename="goodboytrader.log",
-    filemode="a",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-
-# **Security: Load Credentials**
-API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
-SECRET_KEY = os.getenv('OKX_SECRET_KEY', 'your_okx_secret_key')
-PASSPHRASE = os.getenv('OKX_PASSPHRASE', 'your_okx_passphrase')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
-TELEGRAM_CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
-
-# **Validate Credentials**
-required_vars = {
-    'OKX_API_KEY': API_KEY,
-    'OKX_SECRET_KEY': SECRET_KEY,
-    'OKX_PASSPHRASE': PASSPHRASE,
-    'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
-    'CHAT_ID': TELEGRAM_CHAT_ID
-}
-for var_name, var_value in required_vars.items():
-    if var_name == 'CHAT_ID' and not var_value.isdigit() and var_value == f'your_{var_name.lower()}':
-        print(f"⚠️ Error: {var_name} must be a numeric chat ID or properly set.")
-        exit(1)
-    if var_value == f'your_{var_name.lower()}':
-        print(f"⚠️ Error: {var_name} not set in environment variables.")
-        exit(1)
-
-# **Initialize Telegram Bot**
+# Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
 
-# **Trading Parameters**
+# Trading Parameters
 base_trade_size_usdt = 50   # Trade size in USDT
 leverage = 5               # Leverage from backtest
 symbol = "SOL-USDT-SWAP"
@@ -161,7 +77,7 @@ FEES = 0.00075             # 0.075% fees
 stop_loss_pct = 0.025      # 2.5% stop loss
 trailing_stop_factor = 1.8 # 1.8 × ATR trailing stop
 
-# **Tunable Parameters**
+# Tunable Parameters
 ema_short_period = 5
 ema_mid_period = 20
 ema_long_period = 100
@@ -170,7 +86,7 @@ rsi_short_threshold = 45
 adx_4h_threshold = 12
 adx_15m_threshold = 15
 
-# **Startup Message**
+# Startup Message
 startup_message = (
     f" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌\n"
     f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -183,12 +99,12 @@ startup_message = (
     f"📬 Notifications: Telegram to Chat ID {TELEGRAM_CHAT_ID}"
 )
 
-# **Global State**
+# Global State
 position_state = None
 entry_atr = 0
 trade = None
 
-# **Utility Functions**
+# Utility Functions
 async def send_telegram_alert(message):
     try:
         logging.info(f"📩 Sending Telegram Alert: {message}")
@@ -207,11 +123,11 @@ def fetch_with_retries(api_call, max_attempts=3):
             error_msg = f"Attempt {attempt + 1} failed: {str(e)}"
             logging.error(error_msg)
             if attempt < max_attempts - 1:
-                await asyncio.sleep(5 * (attempt + 1))
+                asyncio.sleep(5 * (attempt + 1))
             else:
                 return None
 
-# **Trade Tracker**
+# Trade Tracker
 class TradeTracker:
     def __init__(self):
         self.total_pnl = 0
@@ -237,7 +153,7 @@ class TradeTracker:
 
 tracker = TradeTracker()
 
-# **State Management**
+# State Management
 def save_trade_state(trade, position_state):
     state = {'position_state': position_state, 'trade': trade}
     with open("trade_state.json", 'w') as f:
@@ -255,7 +171,7 @@ def clear_trade_state():
     if os.path.exists("trade_state.json"):
         os.remove("trade_state.json")
 
-# **Indicator Calculations**
+# Indicator Calculations
 def calculate_indicators(df, timeframe='4H'):
     if len(df) < ema_long_period:
         return df
@@ -268,13 +184,13 @@ def calculate_indicators(df, timeframe='4H'):
     df['atr_mean'] = df['atr'].rolling(14).mean()
     return df
 
-# **Data Fetching**
+# Data Fetching
 async def fetch_recent_data(timeframe='4H', limit='400'):
     response = await asyncio.to_thread(
         fetch_with_retries,
         lambda: market_api.get_candlesticks(instId=instId, bar=timeframe, limit=limit)
     )
-    if not response:
+    if not response or 'data' not in response:
         return pd.DataFrame()
     data = response['data'][::-1]
     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
@@ -287,9 +203,9 @@ async def get_current_price():
         fetch_with_retries,
         lambda: market_api.get_ticker(instId=instId)
     )
-    return float(response['data'][0]['last']) if response else None
+    return float(response['data'][0]['last']) if response and 'data' in response else None
 
-# **Entry Logic**
+# Entry Logic
 def check_entry(df_4h, df_15m):
     if len(df_4h) < ema_long_period or len(df_15m) < ema_long_period:
         return None
@@ -319,7 +235,7 @@ def check_entry(df_4h, df_15m):
             return 'long'
     return None
 
-# **Trading Functions**
+# Trading Functions
 async def place_order(side, price, size_usdt):
     global entry_atr
     size_sol = size_usdt / price
@@ -353,7 +269,7 @@ async def close_order(side, price, size_sol, exit_type=''):
         logging.error(f"Close order failed: {response.get('msg', 'Unknown error')}")
         return False
 
-# **Position Monitoring**
+# Position Monitoring
 async def monitor_position(position, entry_price, trade):
     global position_state, entry_atr
     size_sol = trade['size_sol']
@@ -417,14 +333,11 @@ async def monitor_position(position, entry_price, trade):
 
         await asyncio.sleep(10)
 
-# **Initialization**
-market_api = MarketData.MarketAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-trade_api = Trade.TradeAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
-account_api = Account.AccountAPI(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+# Initialization
 account_api.set_position_mode(posMode="long_short_mode")
 account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
 
-# **Main Function**
+# Main Function
 async def main():
     global position_state, trade
     logging.info("✅ Script started successfully")
@@ -469,7 +382,7 @@ async def main():
             await send_telegram_alert(f"🚨 Uh-oh! GoodBoyTrader hit a snag: {str(e)} 😵 Fixing it soon—stay tuned!")
             await asyncio.sleep(60)
 
-# **Run the Bot**
+# Run the Bot
 if __name__ == "__main__":
     try:
         asyncio.run(main())
