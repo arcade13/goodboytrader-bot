@@ -5,25 +5,34 @@ import json
 import pandas as pd
 import ta
 from datetime import datetime
-import okx
-import pkgutil
-
-# Optional debug (remove after confirmation)
-print("OKX version:", okx.__version__)
-print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
-
-from okx.MarketData import MarketAPI
-from okx.Trade import TradeAPI
-from okx.Account import AccountAPI
-
-import logging
-# ... rest of your bot code ...
-logging.info("Starting GoodBoyTrader...")
-print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-# ... etc. ...
 from telegram import Bot
 import subprocess
+import okx
+import pkgutil
 import sys
+
+# Print package details
+print("Python version:", sys.version)
+print("OKX version:", okx.__version__)
+print("OKX path:", okx.__file__)
+print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
+
+# Explore okx.api
+from okx import api
+print("okx.api contents:", dir(api))
+
+# Test original imports
+try:
+    from okx.MarketData import MarketAPI
+    print("MarketAPI from MarketData:", MarketAPI)
+except ModuleNotFoundError as e:
+    print(f"MarketData import failed: {e}")
+
+# Rest of your code (comment out if needed for now)
+import logging
+logging.info("Starting GoodBoyTrader...")
+print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
+# ... rest of your bot logic ...
 
 # **Configure Logging**
 logging.basicConfig(
