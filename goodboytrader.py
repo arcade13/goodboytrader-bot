@@ -5,9 +5,24 @@ import json
 import pandas as pd
 import ta
 from datetime import datetime
-from okx.MarketData import MarketAPI
+import okx
+import pkgutil
+
+print("OKX version:", okx.__version__)
+print("OKX path:", okx.__file__)
+print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
+
+try:
+    from okx.MarketData import MarketAPI
+    print("MarketAPI imported successfully")
+except ModuleNotFoundError as e:
+    print(f"Import failed: {e}")
+
+# Existing imports
 from okx.Trade import TradeAPI
 from okx.Account import AccountAPI
+# ... rest of your code ...
+
 from telegram import Bot
 import subprocess
 import sys
