@@ -25,10 +25,10 @@ logging.info(f"OKX contents: {dir(okx)}")
 print(f"OKX SDK version: {okx.__version__}")
 print(f"OKX contents: {dir(okx)}")
 
-# Temporary imports (will fail, but we want logs first)
-from okx import MarketData as MarketAPI
-from okx import Trade as TradeAPI
-from okx import Account as AccountAPI
+# OKX API Imports (Fixed for v2.1.1)
+from okx.api import Market as MarketAPI
+from okx.api import Trade as TradeAPI
+from okx.api import Account as AccountAPI
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
