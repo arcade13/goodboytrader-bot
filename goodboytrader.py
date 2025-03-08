@@ -45,10 +45,31 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
 
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# ✅ Initialize OKX API Clients
-market_api = Market(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-trade_api = Trade(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-account_api = Account(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+# Define the correct base URL
+BASE_API_URL = "https://www.okx.com"
+
+# ✅ Initialize OKX API Clients with correct domain
+market_api = Market(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0',
+    domain=BASE_API_URL  # Use 'domain' instead of 'base_url'
+)
+trade_api = Trade(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0',
+    domain=BASE_API_URL
+)
+account_api = Account(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0',
+    domain=BASE_API_URL
+)
 
 # Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
