@@ -2,7 +2,6 @@ import asyncio
 import os
 import json
 import sys
-import logging
 from datetime import datetime
 import pandas as pd
 import ta
@@ -25,10 +24,25 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
-logging.info(f"OKX version: {okx.__version__}")
-logging.info(f"OKX module contents: {dir(okx)}")
-# Temporary imports - we’ll fix these after seeing the logs
-from okx import MarketData as MarketAPI  # Keep this for now, expect it to fail
+import okx
+import logging
+
+# Configure Logging (move this up if it’s lower in your file)
+logging.basicConfig(
+    filename="goodboytrader.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+
+# Log OKX version and structure
+logging.info(f"OKX SDK version: {okx.__version__}")
+logging.info(f"OKX contents: {dir(okx)}")
+print(f"OKX SDK version: {okx.__version__}")
+print(f"OKX contents: {dir(okx)}")
+
+# Temporary imports (will fail, but we want the logs first)
+from okx import MarketData as MarketAPI
 from okx import Trade as TradeAPI
 from okx import Account as AccountAPI
 
