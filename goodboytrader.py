@@ -180,9 +180,9 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
     try:
         response = await asyncio.wait_for(
             fetch_with_retries(lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)),
-            timeout=30  # 30s timeout
+            timeout=30  # Keep 30s for now, adjust if needed
         )
-        print(f"DEBUG: Received response for {timeframe}")
+        print(f"DEBUG: Received response for {timeframe}: {response}")
     except asyncio.TimeoutError:
         print(f"❌ ERROR: Timeout after 30s fetching {timeframe} data - main loop will retry")
         logging.error(f"❌ Timeout after 30s fetching {timeframe} data")
@@ -192,9 +192,17 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
         logging.error(f"❌ Exception in fetch_recent_data({timeframe}): {e}")
         return pd.DataFrame()
 
-    if not response or 'data' not in response:
-        print(f"❌ WARNING: No data received for {timeframe} - main loop will retry")
-        logging.warning(f"❌ No data received for {timeframe}")
+    if not response:
+        print(f"❌ WARNING: Response is None for {timeframe} - main loop will retry")
+        logging.warning(f"❌ Response is None for {timeframe}")
+        return pd.DataFrame()
+    if 'code' in response and response['code'] != '0':
+        print(f"❌ ERROR: API error for {timeframe}: code={response['code']}, msg={response.get('msg', 'Unknown')}")
+        logging.error(f"❌ API error for {timeframe}: {response}")
+        return pd.DataFrame()
+    if 'data' not in response or not response['data']:
+        print(f"❌ WARNING: No valid data in response for {timeframe}: {response}")
+        logging.warning(f"❌ No valid data in response for {timeframe}: {response}")
         return pd.DataFrame()
 
     print(f"✅ SUCCESS: Data received for {timeframe}, processing...")
