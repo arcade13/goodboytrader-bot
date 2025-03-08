@@ -310,21 +310,36 @@ async def monitor_position(position, entry_price, trade):
 # Main Function
 async def main():
     global position_state, trade
+    print("DEBUG: Entering main()")  # Debug
     logging.info("✅ Bot Started Successfully!")
-    await send_telegram_alert(startup_message)
+    print("DEBUG: Before Telegram alert")  # Debug
+    try:
+        await asyncio.wait_for(send_telegram_alert(startup_message), timeout=10)  # 10s timeout
+        print("DEBUG: Telegram alert sent")  # Debug
+    except asyncio.TimeoutError:
+        print("DEBUG: Telegram alert timed out, continuing anyway")
+        logging.error("⚠️ Telegram alert timed out, proceeding without notification")
+    except Exception as e:
+        print(f"DEBUG: Telegram alert failed: {e}")
+        logging.error(f"⚠️ Telegram alert failed: {e}, proceeding anyway")
+    
     position_state, trade = load_trade_state()
+    print("DEBUG: After load_trade_state()")  # Debug
     if position_state:
         logging.info(f"Resuming existing {position_state} position from {trade['entry_time']}")
         asyncio.create_task(monitor_position(position_state, trade['entry_price'], trade))
     while True:
         try:
             logging.info("🔄 Checking for trade signals...")
+            print("DEBUG: Fetching 4H data")  # Debug
             df_4h = await fetch_recent_data(timeframe='4H', limit='400')
+            print("DEBUG: Fetching 15m data")  # Debug
             df_15m = await fetch_recent_data(timeframe='15m', limit='100')
             if df_4h.empty or len(df_4h) < ema_long_period or df_15m.empty or len(df_15m) < ema_long_period:
                 logging.warning("⚠️ Insufficient data, waiting...")
                 await asyncio.sleep(60)
                 continue
+            print("DEBUG: Getting current price")  # Debug
             entry_price = await get_current_price()
             if not entry_price:
                 logging.warning("⚠️ Failed to fetch current price, retrying...")
@@ -347,6 +362,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        print("DEBUG: Starting asyncio.run(main())")  # Debug
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n❌ Bot Stopped by User")
