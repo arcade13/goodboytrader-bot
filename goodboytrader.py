@@ -1,14 +1,14 @@
 import os
 import time
-import requests
 import json
 import asyncio
+import logging
+import requests
 import pandas as pd
 import ta
-import logging
 from datetime import datetime
 import telegram
-from okx.api import Market, Trade, Account  # ✅ Correct import
+from okx.api import Market, Trade, Account  # ✅ Corrected Import
 
 # --- Load Environment Variables ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
@@ -19,8 +19,8 @@ CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
 
 # --- OKX API Setup ---
 market_api = Market()
-trade_api = Trade(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
-account_api = Account(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
+trade_api = Trade()  # ✅ No need for API keys here
+account_api = Account()  # ✅ No need for API keys here
 
 # --- Logging Setup ---
 logging.basicConfig(filename='goodboytrader.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
