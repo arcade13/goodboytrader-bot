@@ -1,96 +1,70 @@
+import os
+import time
+import requests
+import json
+import asyncio
 import pandas as pd
 import ta
-from datetime import datetime, timedelta
 import logging
-import os
-import asyncio
+from datetime import datetime
 import telegram
-import time
-from okx.api import Market, Trade, Account  # Ensure correct import
-import requests
+from okx.api import Market, Trade, Account  # ✅ Correct import
 
-# --- Security: Load API Credentials ---
+# --- Load Environment Variables ---
 API_KEY = os.getenv('OKX_API_KEY', 'your_okx_api_key')
 SECRET_KEY = os.getenv('OKX_SECRET_KEY', 'your_okx_secret_key')
 PASSPHRASE = os.getenv('OKX_PASSPHRASE', 'your_okx_passphrase')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_bot_token')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', 'your_telegram_token')
 CHAT_ID = os.getenv('CHAT_ID', 'your_chat_id')
 
-# --- Ensure Correct API URL ---
-OKX_BASE_URL = "https://www.okx.com"
-
-# --- Initialize APIs with Correct URL ---
-market_api = Market(base_url=OKX_BASE_URL)
-trade_api = Trade(base_url=OKX_BASE_URL)
-account_api = Account(base_url=OKX_BASE_URL)
+# --- OKX API Setup ---
+market_api = Market()
+trade_api = Trade(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
+account_api = Account(api_key=API_KEY, api_secret_key=SECRET_KEY, passphrase=PASSPHRASE)
 
 # --- Logging Setup ---
-logging.basicConfig(filename='okx_trading_bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# --- Trading Parameters ---
-base_trade_size_usdt = 50
-leverage = 5
-symbol = "SOL-USDT-SWAP"
-stop_loss_pct = 0.025
-trailing_stop_factor = 1.8
-
-# --- Indicator Parameters ---
-ema_short_period = 5
-ema_mid_period = 20
-ema_long_period = 100
-rsi_long_threshold = 55
-rsi_short_threshold = 45
-adx_4h_threshold = 12
-adx_15m_threshold = 15
+logging.basicConfig(filename='goodboytrader.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Initialize Telegram Bot ---
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 async def send_telegram_alert(message):
+    """Sends an alert to Telegram"""
     try:
         await bot.send_message(chat_id=CHAT_ID, text=message)
+        logging.info(f"Telegram Alert Sent: {message}")
     except Exception as e:
-        logging.error(f"Failed to send Telegram alert: {str(e)}")
+        logging.error(f"Telegram Alert Failed: {e}")
 
-# --- Fetch Market Data with DNS Retry ---
+# --- Utility Function to Fetch Data ---
 def fetch_recent_data(timeframe='4H', limit='400'):
-    for attempt in range(3):
-        try:
-            response = market_api.get_candles(instId=symbol, bar=timeframe, limit=limit)
-            if response:
-                data = response['data'][::-1]
-                df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol'])
-                df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
-                df[['open', 'high', 'low', 'close', 'vol']] = df[['open', 'high', 'low', 'close', 'vol']].astype(float)
-                return df
-        except requests.exceptions.ConnectionError:
-            logging.error("Connection error: Retrying in 5 seconds...")
-            time.sleep(5)
-    return pd.DataFrame()
-
-# --- Check Internet Connection ---
-def check_okx_connection():
+    """Fetches recent market data from OKX"""
     try:
-        response = requests.get("https://www.okx.com/api/v5/public/time", timeout=5)
-        if response.status_code == 200:
-            return True
-    except requests.exceptions.RequestException:
-        return False
-    return False
+        response = market_api.get_candles(instId="SOL-USDT-SWAP", bar=timeframe, limit=limit)
+        if response['code'] != '0':
+            raise Exception(f"API error: {response.get('msg', 'Unknown')}")
+        data = response['data'][::-1]
+        df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
+        df[['open', 'high', 'low', 'close', 'vol']] = df[['open', 'high', 'low', 'close', 'vol']].astype(float)
+        return df
+    except Exception as e:
+        logging.error(f"Error fetching data: {e}")
+        asyncio.run(send_telegram_alert(f"⚠️ Error fetching market data: {e}"))
+        return pd.DataFrame()  # Return empty DataFrame if error occurs
 
-# --- Main Loop ---
-while True:
-    if not check_okx_connection():
-        logging.error("⚠️ No internet connection to OKX! Retrying...")
-        time.sleep(30)
-        continue
+# --- Main Function ---
+if __name__ == "__main__":
+    print("🚀 GoodBoyTrader Bot Started!")
+    logging.info("GoodBoyTrader Bot Started")
 
-    df_4h = fetch_recent_data(timeframe='4H', limit='400')
-    if df_4h.empty:
-        logging.error("Failed to fetch market data. Retrying...")
-        time.sleep(30)
-        continue
-    
-    print("✅ Market data fetched successfully!")
-    logging.info("✅ Market data fetched successfully!")
-    time.sleep(60)
+    while True:
+        df_4h = fetch_recent_data(timeframe='4H', limit='400')
+        if df_4h.empty:
+            print("⚠️ No data fetched, retrying in 60 seconds...")
+            time.sleep(60)
+            continue
+
+        print("✅ Market data fetched successfully.")
+        time.sleep(60)  # Check every minute
+
