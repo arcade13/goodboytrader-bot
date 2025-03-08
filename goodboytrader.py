@@ -1,13 +1,9 @@
 import asyncio
 import os
 import json
-import pandas as pd
-import ta
-from datetime import datetime
-from telegram import Bot
-import subprocess
 import logging
 import sys
+import requests
 
 # Configure Logging
 logging.basicConfig(
@@ -31,40 +27,75 @@ AccountAPI = Account
 API_KEY = os.getenv("OKX_API_KEY") or os.getenv("API_KEY")
 SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("SECRET_KEY")
 PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("PASSPHRASE")
+CHAT_ID = os.getenv("CHAT_ID")
 
-# Debug env vars
+# Debug environment variables
 print(f"DEBUG - API_KEY: {API_KEY}")
 print(f"DEBUG - SECRET_KEY: {SECRET_KEY}")
 print(f"DEBUG - PASSPHRASE: {PASSPHRASE}")
+print(f"DEBUG - CHAT_ID Type: {type(CHAT_ID)}, Value: {CHAT_ID}")
 logging.info(f"DEBUG - API_KEY: {API_KEY}")
 logging.info(f"DEBUG - SECRET_KEY: {SECRET_KEY[:4]}... (masked)")
 logging.info(f"DEBUG - PASSPHRASE: {PASSPHRASE[:4]}... (masked)")
-print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None}")
+logging.info(f"DEBUG - CHAT_ID: {CHAT_ID}")
+print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None} {CHAT_ID is not None}")
 
-# Validate credentials
+# Validate credentials and CHAT_ID
 if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
     raise ValueError("Missing OKX_API_KEY, OKX_SECRET_KEY, or OKX_PASSPHRASE. Check Render's Environment settings.")
+if not CHAT_ID or not CHAT_ID.strip().isdigit():
+    raise ValueError("CHAT_ID must be a numeric value. Check Render's Environment settings.")
 
-# Initialize OKX API clients
-market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-trade_api = TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
-account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
+# Convert CHAT_ID to integer
+CHAT_ID = int(CHAT_ID)
+
+# Initialize OKX API clients with correct base URL
+market_api = MarketAPI(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0',
+    base_api="https://www.okx.com"
+)
+trade_api = TradeAPI(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0',
+    base_api="https://www.okx.com"
+)
+account_api = AccountAPI(
+    key=API_KEY,
+    secret=SECRET_KEY,
+    passphrase=PASSPHRASE,
+    flag='0',
+    base_api="https://www.okx.com"
+)
 
 # Bot Startup
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-logging.info(f"Python executable: {sys.executable}")
 
-# Async main function with debug and corrected API call
+# Async main function with network test and corrected API call
 async def main():
     logging.info("Bot is running...")
+    
+    # Test basic network connectivity to OKX
+    try:
+        response = requests.get("https://www.okx.com/api/v5/public/time")
+        print("DEBUG - OKX Public API Test:", response.json())
+        logging.info(f"DEBUG - OKX Public API Test: {response.json()}")
+    except requests.exceptions.RequestException as e:
+        print(f"DEBUG - OKX Connection Error: {e}")
+        logging.error(f"DEBUG - OKX Connection Error: {e}")
+
     try:
         # Debug available MarketAPI methods
         print("DEBUG - Available MarketAPI methods:", dir(market_api))
         logging.info(f"DEBUG - Available MarketAPI methods: {dir(market_api)}")
 
-        # Try get_history_candlesticks (preferred method)
-        result = market_api.get_history_candlesticks(instId="BTC-USDT", bar="1m")
+        # Use get_candles for recent candlestick data
+        result = market_api.get_candles(instId="BTC-USDT", bar="1m")
         logging.info(f"Candlesticks fetched: {json.dumps(result, indent=2)}")
         print("Candlesticks:", result)
     except AttributeError as e:
