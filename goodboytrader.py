@@ -6,42 +6,50 @@ import ta
 from datetime import datetime
 from telegram import Bot
 import subprocess
-import okx
-import pkgutil
-import sys
-
-# Print package details
-print("Python version:", sys.version)
-print("OKX version:", okx.__version__)
-print("OKX path:", okx.__file__)
-print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
-
-# Explore okx.api
-from okx import api
-print("okx.api contents:", dir(api))
-
-# Test original imports
-try:
-    from okx.MarketData import MarketAPI
-    print("MarketAPI from MarketData:", MarketAPI)
-except ModuleNotFoundError as e:
-    print(f"MarketData import failed: {e}")
-
 import logging
 
-# Test imports based on okx.api contents
-from okx.api import Market  # Likely the class we want
+# Configure Logging
+logging.basicConfig(
+    filename="goodboytrader.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+
+# OKX API Imports
+from okx.api import Market
 from okx.api import Trade
 from okx.api import Account
 
-# Alias to match your code
+# Alias to match your existing code
 MarketAPI = Market
 TradeAPI = Trade
 AccountAPI = Account
 
+# Initialize OKX API clients (update with your credentials)
+API_KEY = os.getenv("API_KEY")  # Load from .env
+SECRET_KEY = os.getenv("SECRET_KEY")
+PASSPHRASE = os.getenv("PASSPHRASE")
+
+market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+trade_api = TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, use_server_time=False, flag='0')
+
+# Bot Startup
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-# ... rest of your bot logic (e.g., market_api = MarketAPI(...)) ...
+
+# ... rest of your bot logic ...
+# Example placeholder for your async trading logic
+async def main():
+    # Add your trading logic here
+    logging.info("Bot is running...")
+    # Example: Fetch market data
+    # result = market_api.get_candlesticks(instId="BTC-USDT", bar="1m")
+    # print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
 # **Configure Logging**
 logging.basicConfig(
