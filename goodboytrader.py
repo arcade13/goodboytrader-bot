@@ -29,13 +29,19 @@ except ModuleNotFoundError as e:
 
 import logging
 
-from okx.api.market import MarketAPI
-from okx.api.trade import TradeAPI
-from okx.api.account import AccountAPI
+# Test imports based on okx.api contents
+from okx.api import Market  # Likely the class we want
+from okx.api import Trade
+from okx.api import Account
+
+# Alias to match your code
+MarketAPI = Market
+TradeAPI = Trade
+AccountAPI = Account
 
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-# ... rest of your bot logic ...
+# ... rest of your bot logic (e.g., market_api = MarketAPI(...)) ...
 
 # **Configure Logging**
 logging.basicConfig(
