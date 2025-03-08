@@ -1,4 +1,4 @@
-git+https://github.com/okxapi/python-okx.git@v2.0.0
+git+https://github.com/okxapi/python-okx.git@v0.3.5
 pandas
 ta
 python-telegram-bot
