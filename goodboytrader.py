@@ -1,7 +1,7 @@
 import asyncio
 import os
 import json
-import sys  # Added for sys.executable
+import sys
 import logging
 from datetime import datetime
 import pandas as pd
@@ -16,10 +16,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports (Updated for v2.1.1)
-from okx import Market as MarketAPI
-from okx import Trade as TradeAPI
-from okx import Account as AccountAPI
+# OKX API Imports (Updated for v2.1.1 submodule structure)
+from okx.v5 import MarketData as MarketAPI
+from okx.v5 import Trade as TradeAPI
+from okx.v5 import Account as AccountAPI
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
@@ -38,7 +38,7 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
 
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API Clients (Updated for v2.1.1)
+# Initialize OKX API Clients
 market_api = MarketAPI.MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 trade_api = TradeAPI.TradeAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
 account_api = AccountAPI.AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
