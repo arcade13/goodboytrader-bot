@@ -7,6 +7,7 @@ from datetime import datetime
 from telegram import Bot
 import subprocess
 import logging
+import sys  # Added to fix NameError
 
 # Configure Logging
 logging.basicConfig(
@@ -46,6 +47,7 @@ account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, 
 # Bot Startup
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
+logging.info(f"Python executable: {sys.executable}")  # This line caused the error
 
 # Async main function
 async def main():
@@ -54,6 +56,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 # **Configure Logging**
 logging.basicConfig(
     filename="goodboytrader.log",
