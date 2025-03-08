@@ -103,18 +103,27 @@ async def send_telegram_alert(message):
     except Exception as e:
         logging.error(f"⚠️ Failed to send Telegram alert: {e}")
 
-async def fetch_with_retries(api_call, max_attempts=3):  # Now async
+async def fetch_with_retries(api_call, max_attempts=3):
     for attempt in range(max_attempts):
         try:
-            response = api_call()
+            print(f"DEBUG: Attempt {attempt + 1} to call OKX API")
+            response = api_call()  # Synchronous call, since MarketAPI isn’t async
+            print(f"DEBUG: Raw API response: {response}")
+            if response is None:
+                raise ValueError("API returned None")
+            if 'code' not in response:
+                raise ValueError("Response missing 'code' key")
             if response['code'] != '0':
-                raise Exception(f"API error: {response.get('msg', 'Unknown')}")
+                raise Exception(f"API error: code={response['code']}, msg={response.get('msg', 'Unknown')}")
             return response
         except Exception as e:
+            print(f"❌ ERROR: Attempt {attempt + 1} failed: {str(e)}")
             logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_attempts - 1:
-                await asyncio.sleep(5 * (attempt + 1))  # Fixed with await
+                await asyncio.sleep(5 * (attempt + 1))
             else:
+                print(f"❌ ERROR: All {max_attempts} attempts failed, giving up")
+                logging.error(f"All {max_attempts} attempts failed")
                 return None
 
 # Trade Tracker
@@ -179,30 +188,33 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
     print(f"DEBUG: Fetching {timeframe} data from OKX with limit={limit}")
     try:
         response = await asyncio.wait_for(
-            fetch_with_retries(lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)),
-            timeout=30  # Keep 30s for now, adjust if needed
+            asyncio.to_thread(  # Run synchronous API call in a thread
+                fetch_with_retries,
+                lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit, instType="SWAP")
+            ),
+            timeout=30
         )
         print(f"DEBUG: Received response for {timeframe}: {response}")
     except asyncio.TimeoutError:
         print(f"❌ ERROR: Timeout after 30s fetching {timeframe} data - main loop will retry")
-        logging.error(f"❌ Timeout after 30s fetching {timeframe} data")
+        logging.error(f"Timeout after 30s fetching {timeframe} data")
         return pd.DataFrame()
     except Exception as e:
         print(f"❌ ERROR: Failed fetching {timeframe} data: {e}")
-        logging.error(f"❌ Exception in fetch_recent_data({timeframe}): {e}")
+        logging.error(f"Exception in fetch_recent_data({timeframe}): {e}")
         return pd.DataFrame()
 
     if not response:
         print(f"❌ WARNING: Response is None for {timeframe} - main loop will retry")
-        logging.warning(f"❌ Response is None for {timeframe}")
+        logging.warning(f"Response is None for {timeframe}")
         return pd.DataFrame()
     if 'code' in response and response['code'] != '0':
         print(f"❌ ERROR: API error for {timeframe}: code={response['code']}, msg={response.get('msg', 'Unknown')}")
-        logging.error(f"❌ API error for {timeframe}: {response}")
+        logging.error(f"API error for {timeframe}: {response}")
         return pd.DataFrame()
     if 'data' not in response or not response['data']:
         print(f"❌ WARNING: No valid data in response for {timeframe}: {response}")
-        logging.warning(f"❌ No valid data in response for {timeframe}: {response}")
+        logging.warning(f"No valid data in response for {timeframe}: {response}")
         return pd.DataFrame()
 
     print(f"✅ SUCCESS: Data received for {timeframe}, processing...")
