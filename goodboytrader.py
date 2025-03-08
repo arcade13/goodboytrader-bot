@@ -7,21 +7,16 @@ import ta
 from datetime import datetime
 import okx
 import pkgutil
+from okx.MarketData import MarketAPI
+from okx.Trade import TradeAPI
+from okx.Account import AccountAPI
 
-print("OKX version:", okx.__version__)
-print("OKX submodules:", [m.name for m in pkgutil.iter_modules(okx.__path__)])
-
-# Try new imports
-try:
-    from okx.api import MarketAPI, TradeAPI, AccountAPI
-    print("Imported MarketAPI, TradeAPI, AccountAPI from okx.api")
-except ImportError as e:
-    print(f"Import from okx.api failed: {e}")
-
-# Rest of your code (remove old imports for now)
-# market_api = MarketAPI(api_key=..., ...)
-# trade_api = TradeAPI(...)
-# account_api = AccountAPI(...)
+# Rest of your code (e.g., logging, bot initialization)
+import logging
+# ... your bot logic ...
+logging.info("Starting GoodBoyTrader...")
+print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
+# ... etc. ...
 from telegram import Bot
 import subprocess
 import sys
