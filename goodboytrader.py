@@ -7,7 +7,7 @@ from datetime import datetime
 from telegram import Bot
 import subprocess
 import logging
-import sys  # Added to fix NameError
+import sys
 
 # Configure Logging
 logging.basicConfig(
@@ -27,17 +27,23 @@ MarketAPI = Market
 TradeAPI = Trade
 AccountAPI = Account
 
-# Load Environment Variables
-API_KEY = os.getenv("API_KEY")
-SECRET_KEY = os.getenv("SECRET_KEY")
-PASSPHRASE = os.getenv("PASSPHRASE")
+# Load Environment Variables (try both naming conventions)
+API_KEY = os.getenv("OKX_API_KEY") or os.getenv("API_KEY")
+SECRET_KEY = os.getenv("OKX_SECRET_KEY") or os.getenv("SECRET_KEY")
+PASSPHRASE = os.getenv("OKX_PASSPHRASE") or os.getenv("PASSPHRASE")
 
 # Debug env vars
+print(f"DEBUG - API_KEY: {API_KEY}")
+print(f"DEBUG - SECRET_KEY: {SECRET_KEY}")
+print(f"DEBUG - PASSPHRASE: {PASSPHRASE}")
+logging.info(f"DEBUG - API_KEY: {API_KEY}")
+logging.info(f"DEBUG - SECRET_KEY: {SECRET_KEY[:4]}... (masked)")
+logging.info(f"DEBUG - PASSPHRASE: {PASSPHRASE[:4]}... (masked)")
 print(f"Env vars loaded: {API_KEY is not None} {SECRET_KEY is not None} {PASSPHRASE is not None}")
 
 # Validate credentials
 if not all([API_KEY, SECRET_KEY, PASSPHRASE]):
-    raise ValueError("Missing API_KEY, SECRET_KEY, or PASSPHRASE. Set them in Render's Environment settings.")
+    raise ValueError("Missing API_KEY, SECRET_KEY, or PASSPHRASE. Check Render's Environment settings.")
 
 # Initialize OKX API clients
 market_api = MarketAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, flag='0')
@@ -47,12 +53,18 @@ account_api = AccountAPI(key=API_KEY, secret=SECRET_KEY, passphrase=PASSPHRASE, 
 # Bot Startup
 logging.info("Starting GoodBoyTrader...")
 print(" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌")
-logging.info(f"Python executable: {sys.executable}")  # This line caused the error
+logging.info(f"Python executable: {sys.executable}")
 
-# Async main function
+# Async main function with test
 async def main():
     logging.info("Bot is running...")
-    # Add your trading logic here (e.g., fetch candlesticks, send Telegram alerts)
+    try:
+        result = market_api.get_candlesticks(instId="BTC-USDT", bar="1m")
+        logging.info(f"Candlesticks fetched: {json.dumps(result, indent=2)}")
+        print("Candlesticks:", result)
+    except Exception as e:
+        logging.error(f"API Error: {str(e)}")
+        print(f"API Error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
