@@ -17,15 +17,18 @@ logging.basicConfig(
 )
 
 # Debug the OKX package structure
+print("DEBUG: Importing okx...")  # Direct print to ensure visibility
 import okx
+print(f"DEBUG: Contents of 'okx' module: {dir(okx)}")
 logging.info(f"Contents of 'okx' module: {dir(okx)}")
 
-# Attempt the import (we’ll adjust based on the output)
+# Attempt the import
 try:
     from okx.MarketData import MarketAPI
     from okx.Trade import TradeAPI
     from okx.Account import AccountAPI
 except ImportError as e:
+    print(f"DEBUG: Import failed: {str(e)}")
     logging.error(f"Import failed: {str(e)}")
     raise
 
