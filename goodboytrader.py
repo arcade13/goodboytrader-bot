@@ -37,24 +37,27 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("CHAT_ID must be numeric.")
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API Clients (Removed 'domain' parameter)
+# Initialize OKX API Clients with base_url
 market_api = MarketAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'  # '0' for real trading, '1' for demo
+    flag='0',  # '0' for real trading, '1' for demo
+    base_url='https://www.okx.com'
 )
 trade_api = TradeAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'
+    flag='0',
+    base_url='https://www.okx.com'
 )
 account_api = AccountAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'
+    flag='0',
+    base_url='https://www.okx.com'
 )
 
 # Initialize Telegram Bot
