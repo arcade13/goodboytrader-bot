@@ -1,4 +1,3 @@
-
 pandas==2.1.4
 ta==0.11.0
 git+https://github.com/okxapi/python-okx.git#egg=python-okx
