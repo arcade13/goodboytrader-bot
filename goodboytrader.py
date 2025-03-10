@@ -16,10 +16,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports (Updated for v2.1.1)
-from okx import Market as MarketAPI
-from okx import Trade as TradeAPI
-from okx import Account as AccountAPI
+# OKX API Imports (Corrected for v2.1.1)
+from okx.MarketData import MarketAPI
+from okx.Trade import TradeAPI
+from okx.Account import AccountAPI
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
@@ -38,21 +38,21 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
 # Initialize OKX API Clients (Updated for v2.1.1 with domain parameter)
-market_api = MarketAPI.MarketAPI(
+market_api = MarketAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0',
     domain="https://www.okx.com"  # Set the correct domain explicitly
 )
-trade_api = TradeAPI.TradeAPI(
+trade_api = TradeAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0',
     domain="https://www.okx.com"  # Set the correct domain explicitly
 )
-account_api = AccountAPI.AccountAPI(
+account_api = AccountAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
