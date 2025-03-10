@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports (Corrected based on dir(okx.api))
+# OKX API Imports
 from okx.api import Market as MarketAPI
 from okx.api import Trade as TradeAPI
 from okx.api import Account as AccountAPI
@@ -37,27 +37,24 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("CHAT_ID must be numeric.")
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API Clients
+# Initialize OKX API Clients (Removed 'domain' parameter)
 market_api = MarketAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0',
-    domain="https://www.okx.com"
+    flag='0'  # '0' for real trading, '1' for demo
 )
 trade_api = TradeAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0',
-    domain="https://www.okx.com"
+    flag='0'
 )
 account_api = AccountAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0',
-    domain="https://www.okx.com"
+    flag='0'
 )
 
 # Initialize Telegram Bot
