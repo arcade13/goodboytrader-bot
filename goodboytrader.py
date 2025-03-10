@@ -16,10 +16,18 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports (Corrected for v2.1.1 based on source files)
-from okx.MarketData import MarketAPI
-from okx.Trade import TradeAPI
-from okx.Account import AccountAPI
+# Debug the OKX package structure
+import okx
+logging.info(f"Contents of 'okx' module: {dir(okx)}")
+
+# Attempt the import (we’ll adjust based on the output)
+try:
+    from okx.MarketData import MarketAPI
+    from okx.Trade import TradeAPI
+    from okx.Account import AccountAPI
+except ImportError as e:
+    logging.error(f"Import failed: {str(e)}")
+    raise
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
@@ -37,27 +45,27 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("CHAT_ID must be numeric.")
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Initialize OKX API Clients (Updated for v2.1.1 with domain parameter)
+# Initialize OKX API Clients
 market_api = MarketAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0',
-    domain="https://www.okx.com"  # Set the correct domain explicitly
+    domain="https://www.okx.com"
 )
 trade_api = TradeAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0',
-    domain="https://www.okx.com"  # Set the correct domain explicitly
+    domain="https://www.okx.com"
 )
 account_api = AccountAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0',
-    domain="https://www.okx.com"  # Set the correct domain explicitly
+    domain="https://www.okx.com"
 )
 
 # Initialize Telegram Bot
@@ -184,7 +192,7 @@ def calculate_indicators(df, timeframe='4H'):
     df['atr_mean'] = df['atr'].rolling(14).mean()
     return df
 
-# Data Fetching (Updated to use get_candles)
+# Data Fetching
 async def fetch_recent_data(timeframe='4H', limit='400'):
     response = await fetch_with_retries(
         lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
