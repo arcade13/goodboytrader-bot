@@ -62,6 +62,7 @@ stop_loss_pct = 0.025
 trailing_stop_factor = 1.8
 
 # Tunable Parameters
+
 ema_short_period = 5
 ema_mid_period = 20
 ema_long_period = 100
@@ -71,6 +72,7 @@ adx_4h_threshold = 12
 adx_15m_threshold = 15
 
 # Startup Message
+
 startup_message = (
     f" 🚀 OKX Trading Bot Initialized - GoodBoyTrader 🌌\n"
     f"📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -84,11 +86,13 @@ startup_message = (
 )
 
 # Global State
+
 position_state = None
 entry_atr = 0
 trade = None
 
 # Utility Functions
+
 async def send_telegram_alert(message):
     try:
         logging.info(f"📩 Sending Telegram Alert: {message}")
@@ -96,10 +100,10 @@ async def send_telegram_alert(message):
     except Exception as e:
         logging.error(f"⚠️ Failed to send Telegram alert: {e}")
 
-def fetch_with_retries(api_call, max_attempts=3):
+async def fetch_with_retries(api_call, max_attempts=3):
     for attempt in range(max_attempts):
         try:
-            response = api_call()
+            response = await asyncio.to_thread(api_call)
             if response['code'] != '0':
                 raise Exception(f"API error: {response.get('msg', 'Unknown')}")
             return response
@@ -111,6 +115,7 @@ def fetch_with_retries(api_call, max_attempts=3):
                 return None
 
 # Trade Tracker
+
 class TradeTracker:
     def __init__(self):
         self.total_pnl = 0
@@ -137,6 +142,7 @@ class TradeTracker:
 tracker = TradeTracker()
 
 # State Management
+
 def save_trade_state(trade, position_state):
     state = {'position_state': position_state, 'trade': trade}
     with open("trade_state.json", 'w') as f:
@@ -155,6 +161,7 @@ def clear_trade_state():
         os.remove("trade_state.json")
 
 # Indicator Calculations
+
 def calculate_indicators(df, timeframe='4H'):
     if len(df) < ema_long_period:
         return df
@@ -174,6 +181,7 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
         lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
     )
     if not response or 'data' not in response:
+
         return pd.DataFrame()
     data = response['data'][::-1]
     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
@@ -197,7 +205,7 @@ def check_entry(df_4h, df_15m):
     bearish_4h = (current_4h['close'] < current_4h['ema_short'] < current_4h['ema_mid'] < current_4h['ema_long'] and
                   current_4h['rsi'] < rsi_short_threshold and current_4h['adx'] >= adx_4h_threshold)
     bullish_4h = (current_4h['close'] > current_4h['ema_short'] > current_4h['ema_mid'] > current_4h['ema_long'] and
-                  current_4h['rsi'] > rsi_long_threshold and current_4h['adx'] >= adx_4h_threshold)
+                  current_4h['rsi'] > rsi_long_threshold and current_4h['adx'] >= adx_4h_threshold)D
     if not bearish_4h and not bullish_4h:
         return None
     if bearish_4h:
@@ -214,12 +222,12 @@ def check_entry(df_4h, df_15m):
             return 'long'
     return None
 
-# Trading Functions
 async def place_order(side, price, size_usdt):
     global entry_atr
     size_sol = size_usdt / price
     size_contracts = max(round(size_sol / lot_size), 1)
     response = await asyncio.to_thread(
+# Trading Functions
         trade_api.place_order,
         instId=instId, tdMode='cross', side='buy' if side == 'long' else 'sell',
         posSide=side, ordType='market', sz=str(size_contracts)
