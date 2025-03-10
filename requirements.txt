@@ -3,4 +3,4 @@ ta
 numpy
 python-telegram-bot
 schedule
-git+https://github.com/okxapi/python-okx.git@v0.3.5#egg=python-okx
+git+https://github.com/okxapi/python-okx.git#egg=python-okx
