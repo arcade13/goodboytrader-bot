@@ -37,16 +37,13 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("CHAT_ID must be numeric.")
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Debug Constructor
-logging.info(f"MarketAPI __init__ args: {MarketAPI.__init__.__code__.co_varnames}")
-
 # Initialize OKX API Clients
 market_api = MarketAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
     flag='0',  # '0' for real trading, '1' for demo
-    domain='https://www.okx.com'  # Explicitly set domain
+    domain='https://www.okx.com'
 )
 trade_api = TradeAPI(
     key=API_KEY,
@@ -227,7 +224,7 @@ def check_entry(df_4h, df_15m):
     elif bullish_4h:
         bullish_15m = (current_15m['ema_short'] > current_15m['ema_mid'] > current_15m['ema_long'] and
                        current_15m['close'] > current_15m['ema_long'] and
-                       current_15m['rsi'] > rsi_short_threshold and current_15m['adx'] >= adx_15m_threshold)
+                       current_15m['rsi'] > rsi_long_threshold and current_15m['adx'] >= adx_15m_threshold)
         if bullish_15m:
             return 'long'
     return None
