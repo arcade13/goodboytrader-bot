@@ -1,1 +1,6 @@
-git+ssh://git@github.com/OKX-API/okx-python.git@9313397
+pandas
+ta
+numpy
+python-telegram-bot
+schedule
+git+https://github.com/okxapi/python-okx.git@93133973812d4206ba0fcfa7c23edbdc76d04c33#egg=python-okx
