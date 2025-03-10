@@ -1,6 +1,1 @@
-okx==2.1.1
-pandas
-ta
-python-telegram-bot
-numpy
-python-dotenv
+git+ssh://git@github.com/OKX-API/okx-python.git@9313397
