@@ -16,10 +16,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports (Corrected for v2.1.1)
-from okx import MarketData as MarketAPI
-from okx import Trade as TradeAPI
-from okx import Account as AccountAPI
+# OKX API Imports (Corrected for v2.1.1 with v5 submodule)
+from okx.v5 import MarketData as MarketAPI
+from okx.v5 import Trade as TradeAPI
+from okx.v5 import Account as AccountAPI
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
