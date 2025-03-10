@@ -103,15 +103,23 @@ async def send_telegram_alert(message):
 async def fetch_with_retries(api_call, max_attempts=3):
     for attempt in range(max_attempts):
         try:
-            response = await asyncio.to_thread(api_call)
+            print(f"DEBUG: Attempt {attempt + 1} to call OKX API")
+            response = api_call()  # Synchronous call, since MarketAPI isn’t async
+            print(f"DEBUG: Raw API response: {response}")
+            if response is None:
+                raise ValueError("API returned None")
+            if 'code' not in response:
+                raise ValueError("Response missing 'code' key")
             if response['code'] != '0':
-                raise Exception(f"API error: {response.get('msg', 'Unknown')}")
+                raise Exception(f"API error: code={response['code']}, msg={response.get('msg', 'Unknown')}")
             return response
         except Exception as e:
             logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
             if attempt < max_attempts - 1:
                 asyncio.sleep(5 * (attempt + 1))
             else:
+                print(f"❌ ERROR: All {max_attempts} attempts failed, giving up")
+                logging.error(f"All {max_attempts} attempts failed")
                 return None
 
 # Trade Tracker
@@ -183,6 +191,22 @@ async def fetch_recent_data(timeframe='4H', limit='400'):
     if not response or 'data' not in response:
 
         return pd.DataFrame()
+    except Exception as e:
+        print(f"❌ ERROR: Exception while fetching {timeframe} data: {e}")
+        logging.error(f"❌ Exception in fetch_recent_data({timeframe}): {e}")
+        return pd.DataFrame()
+
+    print(f"DEBUG: Received response for {timeframe}: {response}")
+    if not response:
+        print(f"❌ ERROR: API response is None for {timeframe}! Double-check `instId` and API permissions.")
+        logging.error(f"❌ API response is None for {timeframe}. instId={instId}")
+        return pd.DataFrame()
+    if 'code' in response and response['code'] != '0':
+        print(f"❌ ERROR: OKX API Error: {response.get('msg', 'Unknown Error')}")
+        logging.error(f"❌ OKX API Error: {response}")
+        return pd.DataFrame()
+
+    print(f"✅ SUCCESS: Data received for {timeframe}, processing...")
     data = response['data'][::-1]
     df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'vol', 'volCcy', 'volCcyQuote', 'confirm'])
     df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
@@ -243,8 +267,7 @@ async def place_order(side, price, size_usdt):
 
 async def close_order(side, price, size_sol, exit_type=''):
     size_contracts = round(size_sol / lot_size)
-    response = await asyncio.to_thread(
-        trade_api.place_order,
+    response = await trade_api.place_order(  # Already async
         instId=instId, tdMode='cross', side=side,
         posSide='long' if side == 'sell' else 'short',
         ordType='market', sz=str(size_contracts)
@@ -322,13 +345,16 @@ async def main():
     logging.info("✅ Bot Started Successfully!")
     await send_telegram_alert(startup_message)
     position_state, trade = load_trade_state()
+    print("DEBUG: After load_trade_state()")  # Debug
     if position_state:
         logging.info(f"Resuming existing {position_state} position from {trade['entry_time']}")
         asyncio.create_task(monitor_position(position_state, trade['entry_price'], trade))
     while True:
         try:
             logging.info("🔄 Checking for trade signals...")
+            print("DEBUG: Fetching 4H data")  # Debug
             df_4h = await fetch_recent_data(timeframe='4H', limit='400')
+            print("DEBUG: Fetching 15m data")  # Debug
             df_15m = await fetch_recent_data(timeframe='15m', limit='100')
             if df_4h.empty or len(df_4h) < ema_long_period or df_15m.empty or len(df_15m) < ema_long_period:
                 logging.warning("⚠️ Insufficient data, waiting...")
