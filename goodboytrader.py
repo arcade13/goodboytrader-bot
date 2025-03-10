@@ -16,20 +16,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Debug OKX API structure
-from okx import api
-print(f"DEBUG: Contents of 'okx.api': {dir(api)}")
-logging.info(f"Contents of 'okx.api': {dir(api)}")
-
-# Attempt the import (will adjust based on debug output)
-try:
-    from okx.api import MarketAPI
-    from okx.api import TradeAPI
-    from okx.api import AccountAPI
-except ImportError as e:
-    print(f"DEBUG: Import failed: {str(e)}")
-    logging.error(f"Import failed: {str(e)}")
-    raise
+# OKX API Imports (Corrected based on dir(okx.api))
+from okx.api import Market as MarketAPI
+from okx.api import Trade as TradeAPI
+from okx.api import Account as AccountAPI
 
 # Load Environment Variables
 API_KEY = os.getenv("OKX_API_KEY")
@@ -250,7 +240,7 @@ async def place_order(side, price, size_usdt):
     )
     if response['code'] == '0':
         size_sol = size_contracts * lot_size
-        alert = f"🎉 GoodBoyTrader jumps in! {side.capitalize()} at {price:.2f} 🚀 Slot_size:.4f} SOL 🌞 Let’s ride the wave!"
+        alert = f"🎉 GoodBoyTrader jumps in! {side.capitalize()} at {price:.2f} 🚀 Size: {size_sol:.4f} SOL 🌞 Let’s ride the wave!"
         await send_telegram_alert(alert)
         return response['data'][0]['ordId'], size_sol
     else:
