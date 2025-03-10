@@ -16,8 +16,8 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# OKX API Imports
-from okx import Market as MarketAPI
+# OKX v5 API Imports
+from okx import MarketData as MarketAPI
 from okx import Trade as TradeAPI
 from okx import Account as AccountAPI
 
@@ -37,36 +37,30 @@ if not CHAT_ID or not CHAT_ID.strip().isdigit():
     raise ValueError("CHAT_ID must be numeric.")
 TELEGRAM_CHAT_ID = int(CHAT_ID)
 
-# Debug Constructor and Original API_URL
+# Debug Constructor
 logging.info(f"MarketAPI __init__ args: {MarketAPI.__init__.__code__.co_varnames}")
-logging.info(f"Original MarketAPI.API_URL: {MarketAPI.API_URL}")
-
-# Override API_URL for all API classes
-MarketAPI.API_URL = 'https://www.okx.com'
-TradeAPI.API_URL = 'https://www.okx.com'
-AccountAPI.API_URL = 'https://www.okx.com'
-
-# Log Updated API_URL
-logging.info(f"Updated MarketAPI.API_URL: {MarketAPI.API_URL}")
 
 # Initialize OKX API Clients
 market_api = MarketAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'  # '0' for real trading, '1' for demo
+    flag='0',  # '0' for real trading, '1' for demo
+    domain='https://www.okx.com'  # Explicitly set domain
 )
 trade_api = TradeAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'
+    flag='0',
+    domain='https://www.okx.com'
 )
 account_api = AccountAPI(
     key=API_KEY,
     secret=SECRET_KEY,
     passphrase=PASSPHRASE,
-    flag='0'
+    flag='0',
+    domain='https://www.okx.com'
 )
 
 # Initialize Telegram Bot
@@ -196,7 +190,7 @@ def calculate_indicators(df, timeframe='4H'):
 # Data Fetching
 async def fetch_recent_data(timeframe='4H', limit='400'):
     response = await fetch_with_retries(
-        lambda: market_api.get_candles(instId=instId, bar=timeframe, limit=limit)
+        lambda: market_api.get_candlesticks(instId=instId, bar=timeframe, limit=limit)
     )
     if not response or 'data' not in response:
         return pd.DataFrame()
@@ -233,7 +227,7 @@ def check_entry(df_4h, df_15m):
     elif bullish_4h:
         bullish_15m = (current_15m['ema_short'] > current_15m['ema_mid'] > current_15m['ema_long'] and
                        current_15m['close'] > current_15m['ema_long'] and
-                       current_15m['rsi'] > rsi_long_threshold and current_15m['adx'] >= adx_15m_threshold)
+                       current_15m['rsi'] > rsi_short_threshold and current_15m['adx'] >= adx_15m_threshold)
         if bullish_15m:
             return 'long'
     return None
@@ -374,4 +368,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nBot Stopped by User")
-
