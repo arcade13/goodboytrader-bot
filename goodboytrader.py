@@ -164,6 +164,30 @@ def verify_tron_tx(txid, amount):
     except:
         return False
 
+def update_user(chat_id, tier, trade_size, expiry=None, api_key=None, api_secret=None, api_pass=None, referral_code=None, referred_by=None, referral_reward_claimed=None, wallet=None):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    profit_cut = 0.15 if tier == "standard" else 0.10 if tier == "elite" else 0
+    signup_date = datetime.now(TIMEZONE).isoformat() if tier == "free" else get_user(chat_id)[5]
+    sub_expiry = expiry or get_user(chat_id)[6]
+    current = get_user(chat_id)
+    referral_reward = referral_reward_claimed if referral_reward_claimed is not None else current[12]
+    wallet = wallet or current[13]
+    c.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+              (chat_id, tier, trade_size, current[3] or 0, profit_cut, signup_date, sub_expiry, 
+               api_key or current[7], api_secret or current[8], api_pass or current[9], 
+               referral_code or current[10], referred_by or current[11], referral_reward, wallet))
+    conn.commit()
+    conn.close()
+
+def get_user(chat_id):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,))
+    result = c.fetchone()
+    conn.close()
+    return result or (chat_id, "free", 0, 0, 0, None, None, None, None, None, None, None, 0, None)
+
 # Telegram Handlers
 async def start(update, context):
     chat_id = str(update.message.chat_id)
@@ -181,7 +205,7 @@ async def start(update, context):
             add_referral(referrer_id, chat_id)
         conn.close()
     
-    tier, _, _, _, _, signup_date, sub_expiry, _, _, _, _, _, _ = get_user(chat_id)
+    tier, _, _, _, _, signup_date, sub_expiry, _, _, _, _, _, _, _ = get_user(chat_id)
     welcome_msg = (
         f"🌙 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
         f"🐾 Welcome to the *first sophisticated trading bot* that analyzes every move before pouncing!\n"
@@ -204,7 +228,7 @@ async def start(update, context):
 
 async def freetrial(update, context):
     chat_id = str(update.message.chat_id)
-    tier, _, _, total_pnl, _, signup_date, sub_expiry, _, _, _, referral_code, _, _ = get_user(chat_id)
+    tier, _, _, total_pnl, _, signup_date, sub_expiry, _, _, _, referral_code, _, _, _ = get_user(chat_id)
     if tier not in ["free", "trial_expired"]:
         await update.message.reply_text("🐶 *Woof!* You’re already a VIP! Check /status.")
         return
@@ -267,7 +291,7 @@ async def verify(update, context):
     chat_id = str(update.message.chat_id)
     try:
         txid = context.args[0]
-        tier, _, _, _, _, _, _, _, _, _, _, referred_by, _ = get_user(chat_id)
+        tier, _, _, _, _, _, _, _, _, _, _, referred_by, _, _ = get_user(chat_id)
         if tier in ["standard", "elite"]:
             await update.message.reply_text("🐶 *Woof!* Already a VIP!")
             return
@@ -297,7 +321,7 @@ async def verify(update, context):
 
 async def setapi(update, context):
     chat_id = str(update.message.chat_id)
-    tier, trade_size, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
+    tier, trade_size, _, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     if tier in ["free", "trial_expired"]:
         await update.message.reply_text("👀 *Woof!* Upgrade with /standard or /elite to trade!")
         return
@@ -316,7 +340,7 @@ async def setapi(update, context):
 
 async def setsize(update, context):
     chat_id = str(update.message.chat_id)
-    tier, _, _, _, _, _, sub_expiry, api_key, _, _, referral_code, _, _ = get_user(chat_id)
+    tier, _, _, _, _, _, sub_expiry, api_key, _, _, referral_code, _, _, _ = get_user(chat_id)
     if tier in ["free", "trial_expired"]:
         await update.message.reply_text("👀 *Woof!* Upgrade with /standard or /elite to trade!")
         return
@@ -351,7 +375,7 @@ async def stoptrading(update, context):
 
 async def settp(update, context):
     chat_id = str(update.message.chat_id)
-    tier, _, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
+    tier, _, _, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     if tier != "elite":
         await update.message.reply_text("🐾 *Woof!* Custom TP is an Elite feature! Upgrade with /elite.")
         return
@@ -375,7 +399,7 @@ async def close(update, context):
 
 async def pnl(update, context):
     chat_id = str(update.message.chat_id)
-    _, _, _, total_pnl, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
+    _, _, _, total_pnl, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     tracker = trackers.get(chat_id, TradeTracker())
     await update.message.reply_text(
         f"💰 *VIP PnL Report*\n\n"
@@ -387,7 +411,7 @@ async def pnl(update, context):
 
 async def status(update, context):
     chat_id = str(update.message.chat_id)
-    tier, trade_size, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
+    tier, trade_size, _, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     pos = position_states.get(chat_id, "None")
     active = trading_active.get(chat_id, False)
     trade = trades.get(chat_id, {})
@@ -545,7 +569,7 @@ def close_order(trade_api, side, price, size_sol, exit_type, chat_id):
 
 def run_trading_logic(chat_id):
     global position_states, entry_atrs, trades, custom_tps
-    tier, trade_size, _, _, _, _, expiry, api_key, api_secret, api_pass = get_user(chat_id)
+    tier, trade_size, _, _, _, _, expiry, api_key, api_secret, api_pass, _, _, _, _ = get_user(chat_id)
     if tier == "free" or datetime.now(TIMEZONE) > datetime.fromisoformat(expiry or '9999-12-31'):
         return
     
@@ -575,7 +599,7 @@ def run_trading_logic(chat_id):
                 f"🐾 Status: {status}"
             )
             if tier == "elite":
-                update_msg += f"\n📊 Points - 4H Short: {s4}/4 | Long: {l4}/4 | 15m Short: {s15}/3 | Long: {l15}/3"
+                update_msg += f"\Musn📊 Points - 4H Short: {s4}/4 | Long: {l4}/4 | 15m Short: {s15}/3 | Long: {l15}/3"
             asyncio.run(send_telegram_alert(chat_id, update_msg))
             last_update = datetime.now(TIMEZONE)
         
@@ -630,30 +654,6 @@ def adjust_trade_size(tier, requested_size):
     elif tier == "elite":
         return min(max(requested_size, 500), 5000)
     return 0
-
-def update_user(chat_id, tier, trade_size, expiry=None, api_key=None, api_secret=None, api_pass=None, referral_code=None, referred_by=None, referral_reward_claimed=None, wallet=None):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    profit_cut = 0.15 if tier == "standard" else 0.10 if tier == "elite" else 0
-    signup_date = datetime.now(TIMEZONE).isoformat() if tier == "free" else get_user(chat_id)[5]
-    sub_expiry = expiry or get_user(chat_id)[6]
-    current = get_user(chat_id)
-    referral_reward = referral_reward_claimed if referral_reward_claimed is not None else current[12]
-    wallet = wallet or current[13] if len(current) > 13 else None
-    c.execute("INSERT OR REPLACE INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-              (chat_id, tier, trade_size, current[3] or 0, profit_cut, signup_date, sub_expiry, 
-               api_key or current[7], api_secret or current[8], api_pass or current[9], 
-               referral_code or current[10], referred_by or current[11], referral_reward, wallet))
-    conn.commit()
-    conn.close()
-
-def get_user(chat_id):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,))
-    result = c.fetchone()
-    conn.close()
-    return result or (chat_id, "free", 0, 0, 0, None, None, None, None, None, None, None, 0, None)
 
 # Main
 init_db()
