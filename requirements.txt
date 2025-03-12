@@ -1,7 +1,7 @@
 pandas
 ta
 numpy
-python-telegram-bot
+python-telegram-bot[job-queue]
 schedule
 pytz
 git+https://github.com/okxapi/python-okx.git@93133973812d4206ba0fcfa7c23edbdc76d04c33#egg=python-okx
