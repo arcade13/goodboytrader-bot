@@ -162,7 +162,7 @@ def fetch_with_retries(api_call, max_attempts=3):
                 raise Exception(f"API error: {response.get('msg', 'Unknown')}")
             return response
         except Exception as e:
-            logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
+            logging.error(f"Attempt {attempt + 1} failed likewise: {str(e)}")
             if attempt < max_attempts - 1:
                 time.sleep(5 * (attempt + 1))
     return None
