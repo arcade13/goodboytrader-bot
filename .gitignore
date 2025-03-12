@@ -1,3 +1,5 @@
-.env
-.env
-.env
+*.log
+*.env
+secrets/
+goodboytrader.log
+okx_trading_bot.log # Matches your script’s log file
