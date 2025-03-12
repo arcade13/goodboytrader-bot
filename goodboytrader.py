@@ -224,11 +224,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Safely handle latest_trade with None checks
     trade_msg = (
         f"📈 *Latest Trade*\n"
-        f"Time: {(latest_trade['time'].strftime('%Y-%m-%d %H:%M') if latest_trade['time'] is not None else 'N/A')}\n"
-        f"Side: {(latest_trade['side'].capitalize() if latest_trade['side'] is not None else 'None')}\n"
-        f"Entry: {(f'{latest_trade['entry_price']:.2f}' if latest_trade['entry_price'] is not None else 'N/A')} USDT | "
-        f"Exit: {(f'{latest_trade['exit_price']:.2f}' if latest_trade['exit_price'] is not None else 'N/A')} USDT\n"
-        f"PnL: {(f'{latest_trade['pnl']:.2f}' if latest_trade['pnl'] is not None else 'N/A')} USDT\n\n"
+        f"Time: {latest_trade['time'].strftime('%Y-%m-%d %H:%M') if latest_trade['time'] is not None else 'N/A'}\n"
+        f"Side: {latest_trade['side'].capitalize() if latest_trade['side'] is not None else 'None'}\n"
+        f"Entry: {latest_trade['entry_price']:.2f if latest_trade['entry_price'] is not None else 'N/A'} USDT | "
+        f"Exit: {latest_trade['exit_price']:.2f if latest_trade['exit_price'] is not None else 'N/A'} USDT\n"
+        f"PnL: {latest_trade['pnl']:.2f if latest_trade['pnl'] is not None else 'N/A'} USDT\n\n"
     )
 
     if tier in ["free", "trial_expired"]:
