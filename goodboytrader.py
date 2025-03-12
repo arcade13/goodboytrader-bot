@@ -168,7 +168,7 @@ def verify_tron_tx(txid, amount):
 def update_user(chat_id, tier, trade_size, expiry=None, api_key=None, api_secret=None, api_pass=None, referral_code=None, referred_by=None, referral_reward_claimed=None, wallet=None):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    profit_cut = 0.05 if tier == "standard" else 0.03 if tier == "elite" else 0  # Updated profit cuts
+    profit_cut = 0.05 if tier == "standard" else 0.03 if tier == "elite" else 0
     signup_date = datetime.now(TIMEZONE).isoformat() if tier == "free" else get_user(chat_id)[5]
     sub_expiry = expiry or get_user(chat_id)[6]
     current = get_user(chat_id)
@@ -207,7 +207,7 @@ async def start(update, context):
         conn.close()
     
     tier, _, _, _, _, signup_date, sub_expiry, _, _, _, _, _, _, _ = get_user(chat_id)
-    referral_link = f"https://t.me/GoodBoyTraderBot?start={referral_code}"  # New referral link
+    referral_link = f"https://t.me/GoodBoyTraderBot?start={referral_code}"
     welcome_msg = (
         f"🌙 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
         f"🐾 Welcome to the *first sophisticated trading bot* that analyzes every move before pouncing!\n"
@@ -215,12 +215,13 @@ async def start(update, context):
         f"🌟 Trading SOL-USDT-SWAP on OKX now – Tier-1 exchanges (Binance, Bybit) coming soon!\n"
         f"🎁 *14-Day Free Trial*: See our biggest wins!\n"
         f"👯 *Refer & Earn*: Invite friends with this link: [{referral_link}]({referral_link})\n"
-        f"   - Earn 1% of their profits monthly when they subscribe!\n\n"
+        f"   - Earn 1% of their profits monthly when they subscribe! Check /referrals\n\n"
         f"🚀 *Choose Your Tier:*\n"
         f"  📍 *Standard ($40/mo)*: 100–500 USDT trades, basic auto-trading, core signals, no custom TP, 5% profit cut.\n"
-        f"  🏆 *Elite ($75/mo)*: 500–5,000 USDT trades, custom TP (/settp), detailed signal updates, *3% profit cut*, priority support.\n\n"
-        f"💡 Start with: /freetrial | /standard | /elite\n"
-        f"📋 Check it out: /pnl, /status, /history\n"
+        f"      **Start Now: /standard**\n"
+        f"  🏆 *Elite ($75/mo)*: 500–5,000 USDT trades, custom TP (/settp), detailed signal updates, *3% profit cut*, priority support.\n"
+        f"      **Start Now: /elite**\n\n"
+        f"💡 *New? Try /freetrial* | Monitor: /pnl, /status, /history, /referrals\n"
         f"📧 Need help? Use /support"
     )
     if tier == "trial_expired" or (tier == "free" and sub_expiry and datetime.now(TIMEZONE) > datetime.fromisoformat(sub_expiry)):
@@ -476,6 +477,35 @@ async def support(update, context):
         parse_mode='Markdown'
     )
 
+async def referrals(update, context):
+    chat_id = str(update.message.chat_id)
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    
+    # Count valid referrals (subscribed to Standard or Elite)
+    c.execute("""
+        SELECT COUNT(*) 
+        FROM referrals r 
+        JOIN users u ON r.referee_id = u.chat_id 
+        WHERE r.referrer_id = ? AND u.tier IN ('standard', 'elite')
+    """, (chat_id,))
+    valid_refs = c.fetchone()[0]
+    
+    # Sum total referral profits
+    c.execute("SELECT SUM(profit) FROM referral_profits WHERE referrer_id = ?", (chat_id,))
+    total_profit = c.fetchone()[0] or 0.0
+    
+    conn.close()
+    
+    referral_msg = (
+        f"👯 *Your Referral Stats*\n\n"
+        f"  Valid Invitees: {valid_refs} (Subscribed VIPs)\n"
+        f"  Total Earnings: {total_profit:.2f} USDT\n\n"
+        f"💡 Invite more with your link: https://t.me/GoodBoyTraderBot?start={generate_referral_code(chat_id)}\n"
+        f"💰 Earn 1% of their profits monthly when they subscribe!"
+    )
+    await update.message.reply_text(referral_msg, parse_mode='Markdown')
+
 # Trading Logic
 class TradeTracker:
     def __init__(self):
@@ -696,7 +726,8 @@ application.add_handler(CommandHandler("pnl", pnl))
 application.add_handler(CommandHandler("status", status))
 application.add_handler(CommandHandler("history", history))
 application.add_handler(CommandHandler("setwallet", setwallet))
-application.add_handler(CommandHandler("support", support))  # New support handler
+application.add_handler(CommandHandler("support", support))
+application.add_handler(CommandHandler("referrals", referrals))  # New referrals handler
 
 # Start payout thread
 threading.Thread(target=lambda: asyncio.run(monthly_payout()), daemon=True).start()
