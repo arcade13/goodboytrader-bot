@@ -58,7 +58,7 @@ custom_tps = {}
 trading_active = {}
 market_api = MarketData.MarketAPI(flag='0')
 pending_verifications = {}
-latest_trade = {"time": None, "side": None, "entry_price": None, "exit_price": None, "pnl": None}  # Track latest trade
+latest_trade = {"time": None, "side": None, "entry_price": None, "exit_price": None, "pnl": None}
 
 # Sample Trades (Top 5 by PnL)
 SAMPLE_TRADES = [
@@ -96,19 +96,7 @@ def add_referral(referrer_id, referee_id):
     conn.commit()
     conn.close()
     asyncio.run(send_telegram_alert(referrer_id, 
-        f"🎉 *Woof!* Your friend (ID: {referee_id[-6:]}) hung out with your code! Earn 1% of their profits when they subscribe!"))
-
-def track_referral_profit(referee_id, profit):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT referrer_id FROM referrals WHERE referee_id = ?", (referee_id,))
-    referrer_id = c.fetchone()
-    if referrer_id and profit > 0:
-        referrer_id = referrer_id[0]
-        c.execute("INSERT INTO referral_profits VALUES (?, ?, ?, ?)",
-                  (referrer_id, referee_id, datetime.now(TIMEZONE).isoformat(), profit * 0.01))
-        conn.commit()
-    conn.close()
+        f"🎉 *Woof!* Your friend (ID: {referee_id[-6:]}) joined with your code! Earn 1% of their profits when they subscribe!"))
 
 async def monthly_payout():
     while True:
@@ -135,7 +123,7 @@ async def monthly_payout():
             c.execute("DELETE FROM referral_profits WHERE trade_time LIKE ?", (f"{now.year}-{str(now.month).zfill(2)}%",))
             conn.commit()
             conn.close()
-        time.sleep(3600)
+        await asyncio.sleep(3600)
 
 # Utility Functions
 async def send_telegram_alert(chat_id, message, reply_markup=None):
@@ -423,7 +411,7 @@ class TradeTracker:
         self.wins = 0
         self.losses = 0
 
-    def update(self, trade, chat_id):
+    async def update(self, trade, chat_id):
         global latest_trade
         size = trade['size_sol']
         entry_value = trade['entry_price'] * size
@@ -455,8 +443,8 @@ class TradeTracker:
             "exit_price": trade['exit_price'],
             "pnl": user_pnl
         }
-        asyncio.run(send_telegram_alert(chat_id, 
-            f"💰 *VIP Win!* {trade['exit_type']} at {trade['exit_price']:.2f}! You made {user_pnl:.2f} USDT (Cut: {pnl * profit_cut:.2f})"))
+        await send_telegram_alert(chat_id, 
+            f"💰 *VIP Win!* {trade['exit_type']} at {trade['exit_price']:.2f}! You made {user_pnl:.2f} USDT (Cut: {pnl * profit_cut:.2f})")
         await pin_latest_trade(chat_id)
 
 def fetch_recent_data(timeframe='4H', limit='400'):
@@ -473,34 +461,174 @@ def fetch_recent_data(timeframe='4H', limit='400'):
     df['atr'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)
     return df
 
-def run_trading_logic(chat_id):
-    # Simplified for brevity—ensure latest_trade updates here too
-    pass
+def check_entry(df_4h, df_15m):
+    if len(df_4h) < 2 or len(df_15m) < 1:
+        return None, 0, 0, 0, 0
+    current_4h, prev_4h = df_4h.iloc[-1], df_4h.iloc[-2]
+    current_15m = df_15m.iloc[-1]
+    
+    short_points_4h = sum([
+        prev_4h['ema_5'] > prev_4h['ema_100'] and current_4h['ema_5'] < current_4h['ema_100'],
+        prev_4h['ema_20'] > prev_4h['ema_100'] and current_4h['ema_20'] < current_4h['ema_100'],
+        current_4h['ema_5'] < current_4h['ema_100'],
+        current_4h['ema_20'] < current_4h['ema_100']
+    ])
+    long_points_4h = sum([
+        prev_4h['ema_5'] < prev_4h['ema_100'] and current_4h['ema_5'] > current_4h['ema_100'],
+        prev_4h['ema_20'] < prev_4h['ema_100'] and current_4h['ema_20'] > current_4h['ema_100'],
+        current_4h['ema_5'] > current_4h['ema_100'],
+        current_4h['ema_20'] > current_4h['ema_100']
+    ])
+    short_points_15m = sum([
+        current_15m['close'] < current_15m['ema_100'],
+        current_15m['ema_5'] < current_15m['ema_20'],
+        current_15m['ema_20'] < current_15m['ema_100']
+    ])
+    long_points_15m = sum([
+        current_15m['close'] > current_15m['ema_100'],
+        current_15m['ema_5'] > current_15m['ema_20'],
+        current_15m['ema_20'] > current_15m['ema_100']
+    ])
+    
+    if short_points_4h >= 3 and short_points_15m == 3:
+        return 'short', short_points_4h, long_points_4h, short_points_15m, long_points_15m
+    elif long_points_4h >= 3 and long_points_15m == 3:
+        return 'long', short_points_4h, long_points_4h, short_points_15m, long_points_15m
+    return None, short_points_4h, long_points_4h, short_points_15m, long_points_15m
+
+def place_order(trade_api, side, price, size_usdt):
+    size_sol = (size_usdt * leverage) / price
+    size_contracts = max(round(size_sol / lot_size), 1)
+    response = fetch_with_retries(lambda: trade_api.place_order(
+        instId=instId, tdMode='cross', side='buy' if side == 'long' else 'sell',
+        posSide=side, ordType='market', sz=str(size_contracts)
+    ))
+    if response and response['code'] == '0':
+        return response['data'][0]['ordId'], size_contracts * lot_size
+    return None, 0
+
+def close_order(trade_api, side, price, size_sol, exit_type, chat_id):
+    size_contracts = round(size_sol / lot_size)
+    response = fetch_with_retries(lambda: trade_api.place_order(
+        instId=instId, tdMode='cross', side=side,
+        posSide='long' if side == 'sell' else 'short',
+        ordType='market', sz=str(size_contracts)
+    ))
+    if response and response['code'] == '0':
+        asyncio.run(send_telegram_alert(chat_id, f"🏁 *VIP Exit!* Closed at {price:.2f} ({exit_type})"))
+        return True
+    return False
+
+async def run_trading_logic(chat_id):
+    global position_states, entry_atrs, trades, custom_tps
+    tier, trade_size, _, _, _, _, expiry, api_key, api_secret, api_pass, _, _, _, _ = get_user(chat_id)
+    if tier == "free" or datetime.now(TIMEZONE) > datetime.fromisoformat(expiry or '9999-12-31'):
+        return
+    
+    trade_api = Trade.TradeAPI(api_key=api_key, api_secret_key=api_secret, passphrase=api_pass, use_server_time=False, flag='0')
+    last_update = datetime.now(TIMEZONE) - timedelta(minutes=15)
+    
+    while True:
+        if not trading_active.get(chat_id, False):
+            await asyncio.sleep(10)
+            continue
+        
+        df_4h = fetch_recent_data(timeframe='4H', limit='400')
+        df_15m = fetch_recent_data(timeframe='15m', limit='100')
+        if df_4h.empty or len(df_4h) < ema_long_period or df_15m.empty or len(df_15m) < ema_long_period:
+            await asyncio.sleep(10)
+            continue
+        
+        current_price = float(market_api.get_ticker(instId=instId)['data'][0]['last'])
+        signal, s4, l4, s15, l15 = check_entry(df_4h, df_15m)
+        
+        if (datetime.now(TIMEZONE) - last_update).total_seconds() >= 900:
+            trend = "Up" if df_15m['ema_5'].iloc[-1] > df_15m['ema_100'].iloc[-1] else "Down"
+            status = f"In {trades[chat_id]['side'].capitalize()} at {trades[chat_id]['entry_price']:.2f}" if chat_id in position_states else "Waiting for signal"
+            update_msg = (
+                f"🌟 *VIP Update* (15-min)\n\n"
+                f"💸 SOL-USDT: {current_price:.2f} | Trend: {trend}\n"
+                f"🐾 Status: {status}"
+            )
+            if tier == "elite":
+                update_msg += f"\n📊 Points - 4H Short: {s4}/4 | Long: {l4}/4 | 15m Short: {s15}/3 | Long: {l15}/3"
+            await send_telegram_alert(chat_id, update_msg)
+            last_update = datetime.now(TIMEZONE)
+        
+        if signal and chat_id not in position_states:
+            order_id, size_sol = place_order(trade_api, signal, current_price, trade_size)
+            if order_id:
+                entry_msg = (
+                    f"🚀 *VIP Trade On!* {signal.capitalize()} at {current_price:.2f} with {trade_size} USDT!"
+                )
+                if tier == "elite":
+                    entry_msg += f"\n📊 Trigger Points - 4H Short: {s4}/4 | Long: {l4}/4 | 15m Short: {s15}/3 | Long: {l15}/3"
+                await send_telegram_alert(chat_id, entry_msg)
+                trades[chat_id] = {'entry_time': datetime.now(TIMEZONE), 'entry_price': current_price, 'side': signal, 'size_sol': size_sol}
+                position_states[chat_id] = signal
+                entry_atrs[chat_id] = df_15m['atr'].iloc[-1]
+                
+                stop_loss = current_price * (1 - stop_loss_pct) if signal == 'long' else current_price * (1 + stop_loss_pct)
+                trailing_sl = current_price + (entry_atrs[chat_id] * trailing_stop_factor) if signal == 'long' else current_price - (entry_atrs[chat_id] * trailing_stop_factor)
+                
+                while position_states.get(chat_id) == signal:
+                    current_price = float(market_api.get_ticker(instId=instId)['data'][0]['last'])
+                    current_price -= current_price * SLIPPAGE if signal == 'long' else -current_price * SLIPPAGE
+                    
+                    custom_tp = custom_tps.get(chat_id) if tier == "elite" else None
+                    if custom_tp and ((signal == 'long' and current_price >= custom_tp) or (signal == 'short' and current_price <= custom_tp)):
+                        if close_order(trade_api, 'sell' if signal == 'long' else 'buy', current_price, size_sol, 'Custom TP', chat_id):
+                            trades[chat_id].update({'exit_time': datetime.now(TIMEZONE), 'exit_price': current_price, 'exit_type': 'Custom TP'})
+                            await trackers[chat_id].update(trades[chat_id], chat_id)
+                            del position_states[chat_id]
+                            del custom_tps[chat_id]
+                    elif (signal == 'long' and current_price <= stop_loss) or (signal == 'short' and current_price >= stop_loss):
+                        if close_order(trade_api, 'sell' if signal == 'long' else 'buy', current_price, size_sol, 'Stop Loss', chat_id):
+                            trades[chat_id].update({'exit_time': datetime.now(TIMEZONE), 'exit_price': current_price, 'exit_type': 'Stop Loss'})
+                            await trackers[chat_id].update(trades[chat_id], chat_id)
+                            del position_states[chat_id]
+                    elif (signal == 'long' and current_price <= trailing_sl) or (signal == 'short' and current_price >= trailing_sl):
+                        if close_order(trade_api, 'sell' if signal == 'long' else 'buy', current_price, size_sol, 'Trailing Stop', chat_id):
+                            trades[chat_id].update({'exit_time': datetime.now(TIMEZONE), 'exit_price': current_price, 'exit_type': 'Trailing Stop'})
+                            await trackers[chat_id].update(trades[chat_id], chat_id)
+                            del position_states[chat_id]
+                    elif position_states.get(chat_id) == "closing":
+                        if close_order(trade_api, 'sell' if signal == 'long' else 'buy', current_price, size_sol, 'Manual Close', chat_id):
+                            trades[chat_id].update({'exit_time': datetime.now(TIMEZONE), 'exit_price': current_price, 'exit_type': 'Manual Close'})
+                            await trackers[chat_id].update(trades[chat_id], chat_id)
+                            del position_states[chat_id]
+                    await asyncio.sleep(10)
+        await asyncio.sleep(300)
 
 # Main
-init_db()
-if not TELEGRAM_TOKEN:
-    logging.error("TELEGRAM_TOKEN not set in environment variables. Exiting.")
-    sys.exit(1)
+async def main():
+    init_db()
+    if not TELEGRAM_TOKEN:
+        logging.error("TELEGRAM_TOKEN not set in environment variables. Exiting.")
+        sys.exit(1)
 
-application = Application.builder().token(TELEGRAM_TOKEN).build()
-bot = application.bot
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    global bot
+    bot = application.bot
 
-# Add handlers
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("pnl", pnl))
-application.add_handler(CommandHandler("status", status))
-application.add_handler(CommandHandler("history", history))
-application.add_handler(CommandHandler("referrals", referrals))
-application.add_handler(CallbackQueryHandler(button_handler))
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("pnl", pnl))
+    application.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("history", history))
+    application.add_handler(CommandHandler("referrals", referrals))
+    application.add_handler(CallbackQueryHandler(button_handler))
 
-# Start payout thread
-threading.Thread(target=lambda: asyncio.run(monthly_payout()), daemon=True).start()
+    # Start payout thread
+    asyncio.create_task(monthly_payout())
 
-# Start the bot
-application.run_polling()
+    # Start the bot
+    await application.run_polling()
 
-# Keep main thread alive
-while True:
-    logging.info("Heartbeat: Bot running...")
-    time.sleep(60)
+    # Keep main thread alive with heartbeat
+    while True:
+        logging.info("Heartbeat: Bot running...")
+        await asyncio.sleep(60)
+
+if __name__ == "__main__":
+    asyncio.run(main())
