@@ -40,7 +40,7 @@ logging.info(f"Python version: {sys.version}")
 # Constants
 OKX_REFERRAL_LINK = "https://www.okx.com/join/43051887"
 USDT_TRC20_ADDRESS = "TWVQnJJd8S1Kb6DXhNhsaREcMrYunUtswA"
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8197397355:AAG0wqCpgdsjzgD1x5rnsEWoZy8WBVQNJdw")  # New token, ideally from env
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Load from env var only
 TIMEZONE = pytz.timezone('Asia/Singapore')
 leverage = 5
 instId = "SOL-USDT-SWAP"
@@ -503,6 +503,10 @@ def get_user(chat_id):
 
 # Main
 init_db()
+if not TELEGRAM_TOKEN:
+    logging.error("TELEGRAM_TOKEN not set in environment variables. Exiting.")
+    sys.exit(1)
+
 application = Application.builder().token(TELEGRAM_TOKEN).build()
 bot = application.bot
 
@@ -527,4 +531,4 @@ application.run_polling()
 # Keep main thread alive
 while True:
     logging.info("Heartbeat: Bot running...")
-    time.sleep(1)
+    time.sleep(60)  # Reduced frequency to avoid log spam
