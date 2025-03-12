@@ -79,7 +79,7 @@ ema_mid_period = 20
 ema_long_period = 100
 
 # --- Timezone Setup ---
-TIMEZONE = pytz.timezone('UTC')  # Change to your local timezone, e.g., 'America/New_York'
+TIMEZONE = pytz.timezone('Asia/Singapore')  # Singapore time (UTC+08:00)
 
 # --- Detailed Startup Message ---
 startup_message = (
@@ -414,7 +414,7 @@ def monitor_points():
 
             # Real-time trade trigger
             if signal and position_state is None:
-                logging.info(f"Real-time trigger: {signal} detected, executing trade now.")
+                logging.info(f"Real-time trigger: {signal} detected, executing trade now Formats.")
                 run_trading_logic()
 
             time.sleep(10)
@@ -489,4 +489,3 @@ while True:
     schedule.run_pending()
     logging.info("Heartbeat: Scheduler running...")
     time.sleep(1)
-
