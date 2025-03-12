@@ -262,6 +262,10 @@ async def freetrial(update, context):
 
 async def standard(update, context):
     chat_id = str(update.message.chat_id)
+    keyboard = [
+        [InlineKeyboardButton("📋 Copy USDT Address", url=f"tg://msg?text={USDT_TRC20_ADDRESS}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         f"🚀 *Standard Tier ($40/month)*\n\n"
         f"💡 *What You Get:*\n"
@@ -271,13 +275,20 @@ async def standard(update, context):
         f"  - Predefined stop-loss & trailing stops (no custom TP)\n"
         f"  - Basic 15-min updates (price & trend only)\n"
         f"  - 5% profit cut\n\n"
-        f"💸 Send 40 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`\n"
-        f"📩 Then: /verify <txid>\n\n"
-        f"🐾 Affordable entry for casual traders—want more control? See /elite!"
-    , parse_mode='Markdown')
+        f"💸 *Payment Instructions:*\n"
+        f"  Send 40 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`\n"
+        f"  Then use: /verify <txid>\n\n"
+        f"🐾 Affordable entry for casual traders—want more control? See /elite!",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
 async def elite(update, context):
     chat_id = str(update.message.chat_id)
+    keyboard = [
+        [InlineKeyboardButton("📋 Copy USDT Address", url=f"tg://msg?text={USDT_TRC20_ADDRESS}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         f"🏆 *Elite Tier ($75/month)*\n\n"
         f"💡 *What You Get:*\n"
@@ -287,10 +298,13 @@ async def elite(update, context):
         f"  - Enhanced 15-min updates with signal points (e.g., 4H Short: X/4)\n"
         f"  - *Higher profit retention: 3% cut* (vs. 5% Standard)\n"
         f"  - Priority support & future premium features (e.g., Binance/Bybit pairs)\n\n"
-        f"💸 Send 75 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`\n"
-        f"📩 Then: /verify <txid>\n\n"
-        f"🐾 The ultimate edge for serious traders—maximize your wins!"
-    , parse_mode='Markdown')
+        f"💸 *Payment Instructions:*\n"
+        f"  Send 75 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`\n"
+        f"  Then use: /verify <txid>\n\n"
+        f"🐾 The ultimate edge for serious traders—maximize your wins!",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
 async def verify(update, context):
     chat_id = str(update.message.chat_id)
@@ -382,7 +396,7 @@ async def settp(update, context):
     chat_id = str(update.message.chat_id)
     tier, _, _, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     if tier != "elite":
-        await update.message.reply_text("🐾 *Woof!* Custom TP is an Elite feature! Upgrade with /elite.")
+        await update.message.reply \n\nreply_text("🐾 *Woof!* Custom TP is an Elite feature! Upgrade with /elite.")
         return
     if chat_id not in position_states:
         await update.message.reply_text("🐾 *Woof!* No active position!")
@@ -482,7 +496,6 @@ async def referrals(update, context):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     
-    # Count valid referrals (subscribed to Standard or Elite)
     c.execute("""
         SELECT COUNT(*) 
         FROM referrals r 
@@ -491,7 +504,6 @@ async def referrals(update, context):
     """, (chat_id,))
     valid_refs = c.fetchone()[0]
     
-    # Sum total referral profits
     c.execute("SELECT SUM(profit) FROM referral_profits WHERE referrer_id = ?", (chat_id,))
     total_profit = c.fetchone()[0] or 0.0
     
@@ -537,7 +549,7 @@ class TradeTracker:
                    trade['exit_time'].isoformat(), trade['exit_price'], trade['side'], size, user_pnl))
         conn.commit()
         conn.close()
-        track_referral_profit(chat_id, user_pnl)  # Track profit for referrer
+        track_referral_profit(chat_id, user_pnl)
         asyncio.run(send_telegram_alert(chat_id, 
             f"💰 *VIP Win!* {trade['exit_type']} at {trade['exit_price']:.2f}! You made {user_pnl:.2f} USDT (Cut: {pnl * profit_cut:.2f})"))
 
@@ -727,7 +739,7 @@ application.add_handler(CommandHandler("status", status))
 application.add_handler(CommandHandler("history", history))
 application.add_handler(CommandHandler("setwallet", setwallet))
 application.add_handler(CommandHandler("support", support))
-application.add_handler(CommandHandler("referrals", referrals))  # New referrals handler
+application.add_handler(CommandHandler("referrals", referrals))
 
 # Start payout thread
 threading.Thread(target=lambda: asyncio.run(monthly_payout()), daemon=True).start()
