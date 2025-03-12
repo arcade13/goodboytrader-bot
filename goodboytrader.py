@@ -95,7 +95,7 @@ def add_referral(referrer_id, referee_id):
     conn.commit()
     conn.close()
     asyncio.run_coroutine_threadsafe(send_telegram_alert(referrer_id, 
-        f"🎉 *Woof!* Your friend (ID: {referee_id[-6:]}) joined with your code! Earn 1% of their profits when they subscribe!"), 
+        f"🐶 Woof! Your friend (ID: {referee_id[-6:]}) joined with your code! Earn 1% of their profits when they subscribe!"), 
         asyncio.get_event_loop())
 
 async def monthly_payout(context: ContextTypes.DEFAULT_TYPE):
@@ -113,12 +113,12 @@ async def monthly_payout(context: ContextTypes.DEFAULT_TYPE):
                 wallet = wallet_result[0] if wallet_result else None
                 if wallet:
                     await send_telegram_alert(referrer_id,
-                        f"💰 *Referral Payout!* You earned {total_profit:.2f} USDT from your invitees last month!\n"
+                        f"💰 Referral Payout! You earned {total_profit:.2f} USDT from your invitees last month!\n"
                         f"Sent to: {wallet}\n"
                         f"Update wallet: /setwallet <USDT_TRC20_address>")
                 else:
                     await send_telegram_alert(referrer_id,
-                        f"💰 *Referral Payout!* You earned {total_profit:.2f} USDT from your invitees last month!\n"
+                        f"💰 Referral Payout! You earned {total_profit:.2f} USDT from your invitees last month!\n"
                         f"Set a wallet to claim: /setwallet <USDT_TRC20_address>")
             c.execute("DELETE FROM referral_profits WHERE trade_time LIKE ?", (f"{now.year}-{str(now.month).zfill(2)}%",))
             conn.commit()
@@ -141,7 +141,7 @@ async def send_telegram_alert(chat_id, message, reply_markup=None):
 async def pin_latest_trade(chat_id):
     if latest_trade["time"]:
         trade_msg = (
-            f"📈 *Latest Trade* (Pinned)\n"
+            f"📌 *Latest Trade (Pinned)*\n"
             f"Time: {latest_trade['time'].strftime('%Y-%m-%d %H:%M')}\n"
             f"Side: {latest_trade['side'].capitalize()}\n"
             f"Entry: {latest_trade['entry_price']:.2f} USDT | Exit: {latest_trade['exit_price']:.2f} USDT\n"
@@ -206,7 +206,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.message.chat_id)
     referral_code = generate_referral_code(chat_id)
     referred_by = context.args[0] if context.args else None
-    
+
     if referred_by and referred_by.startswith("GBT"):
         referrer_id = None
         conn = sqlite3.connect('users.db')
@@ -217,75 +217,76 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             referrer_id = result[0]
             add_referral(referrer_id, chat_id)
         conn.close()
-    
+
     tier, trade_size, _, total_pnl, _, signup_date, sub_expiry, api_key, api_secret, api_pass, _, _, _, _ = get_user(chat_id)
     referral_link = f"https://t.me/GoodBoyTraderBot?start={referral_code}"
-    
+
+    # Safely handle latest_trade with None checks
     trade_msg = (
         f"📈 *Latest Trade*\n"
-        f"Time: {latest_trade['time'].strftime('%Y-%m-%d %H:%M') if latest_trade['time'] else 'N/A'}\n"
-        f"Side: {latest_trade['side'].capitalize() if latest_trade['side'] else 'None'}\n"
-        f"Entry: {latest_trade['entry_price']:.2f if latest_trade['entry_price'] else 'N/A'} USDT | "
-        f"Exit: {latest_trade['exit_price']:.2f if latest_trade['exit_price'] else 'N/A'} USDT\n"
-        f"PnL: {latest_trade['pnl']:.2f if latest_trade['pnl'] else 'N/A'} USDT\n\n"
+        f"Time: {(latest_trade['time'].strftime('%Y-%m-%d %H:%M') if latest_trade['time'] is not None else 'N/A')}\n"
+        f"Side: {(latest_trade['side'].capitalize() if latest_trade['side'] is not None else 'None')}\n"
+        f"Entry: {(f'{latest_trade['entry_price']:.2f}' if latest_trade['entry_price'] is not None else 'N/A')} USDT | "
+        f"Exit: {(f'{latest_trade['exit_price']:.2f}' if latest_trade['exit_price'] is not None else 'N/A')} USDT\n"
+        f"PnL: {(f'{latest_trade['pnl']:.2f}' if latest_trade['pnl'] is not None else 'N/A')} USDT\n\n"
     )
-    
+
     if tier in ["free", "trial_expired"]:
         keyboard = [
             [InlineKeyboardButton("📊 PnL", callback_data='pnl'),
-             InlineKeyboardButton("📈 Free Trial", callback_data='freetrial')],
-            [InlineKeyboardButton("💸 Standard", callback_data='standard'),
-             InlineKeyboardButton("🏆 Elite", callback_data='elite')],
-            [InlineKeyboardButton("👯 Referrals", callback_data='referrals'),
-             InlineKeyboardButton("📧 Support", callback_data='support')]
+             InlineKeyboardButton("🎁 Free Trial", callback_data='freetrial')],
+            [InlineKeyboardButton("⭐ Standard", callback_data='standard'),
+             InlineKeyboardButton("🌟 Elite", callback_data='elite')],
+            [InlineKeyboardButton("👥 Referrals", callback_data='referrals'),
+             InlineKeyboardButton("📞 Support", callback_data='support')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         days_left = (datetime.fromisoformat(sub_expiry) - datetime.now(TIMEZONE)).days if sub_expiry else 14
         dashboard_msg = (
-            f"🌙 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
-            f"🐾 *Welcome to the first sophisticated trading bot* that analyzes every move before pouncing!\n"
-            f"💰 *92% Proven Success from 5-Month Backtests!*\n"
-            f"🌟 Trading SOL-USDT-SWAP on OKX now – Tier-1 exchanges (Binance, Bybit) coming soon!\n"
-            f"🎁 14-Day Free Trial: See our biggest wins!\n"
+            f"🐶 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
+            f"Welcome to the first sophisticated trading bot that analyzes every move before pouncing!\n"
+            f"✅ *92% Proven Success* from 5-Month Backtests!\n"
+            f"📈 Trading *SOL-USDT-SWAP* on OKX now – Tier-1 exchanges (Binance, Bybit) coming soon!\n"
+            f"🎁 *14-Day Free Trial*: See our biggest wins!\n"
             f"{trade_msg}"
-            f"🎉 Tier: {tier.capitalize()} | Trial Days Left: {days_left}/14\n"
-            f"💰 PnL: {total_pnl:.2f} USDT\n"
-            f"👯 *Refer & Earn*: Invite friends with this link: [{referral_link}]({referral_link})\n"
+            f"🔹 *Tier*: {tier.capitalize()} | *Trial Days Left*: {days_left}/14\n"
+            f"💰 *PnL*: {total_pnl:.2f} USDT\n"
+            f"👥 *Refer & Earn*: Invite friends with this link: {referral_link}\n"
             f"   - Earn 1% of their profits monthly when they subscribe! Check /referrals\n\n"
-            f"🚀 *Choose Your Tier:*\n"
-            f"  📍 *Standard ($40/mo)*: Unlock 100–500 USDT trade size on 5x leverage, basic auto-trading with EMA signals (4H & 15m), predefined stop-loss & trailing stops, 5% profit cut.\n"
-            f"      *Start Now: /standard*\n"
-            f"  🏆 *Elite ($75/mo)*: Unlock 500–5,000 USDT trade size on 5x leverage, all Standard features plus custom TP (/settp), detailed 15-min signal updates, 3% profit cut, priority support.\n"
-            f"      *Start Now: /elite*\n\n"
-            f"💡 *New? Try /freetrial* | Navigate below!"
+            f"🔧 *Choose Your Tier*:\n"
+            f"   *Standard ($40/mo)*: Unlock 100–500 USDT trade size on 5x leverage, basic auto-trading with EMA signals (4H & 15m), predefined stop-loss & trailing stops, 5% profit cut.\n"
+            f"      Start Now: /standard\n"
+            f"   *Elite ($75/mo)*: Unlock 500–5,000 USDT trade size on 5x leverage, all Standard features plus custom TP (/settp), detailed 15-min signal updates, 3% profit cut, priority support.\n"
+            f"      Start Now: /elite\n\n"
+            f"🆕 New? Try /freetrial | Navigate below!"
         )
         if tier == "trial_expired" or (sub_expiry and datetime.now(TIMEZONE) > datetime.fromisoformat(sub_expiry)):
             update_user(chat_id, "free", 0, expiry=(datetime.now(TIMEZONE) + timedelta(days=14)).isoformat(), referral_code=referral_code, referred_by=referred_by)
-            await update.message.reply_text(f"*Trial Reset!* {dashboard_msg}", reply_markup=reply_markup, parse_mode='Markdown')
+            await update.message.reply_text(f"🎉 *Trial Reset!* {dashboard_msg}", reply_markup=reply_markup, parse_mode='Markdown')
         else:
             update_user(chat_id, "free", 0, expiry=(datetime.now(TIMEZONE) + timedelta(days=14)).isoformat(), referral_code=referral_code, referred_by=referred_by)
             await update.message.reply_text(dashboard_msg, reply_markup=reply_markup, parse_mode='Markdown')
     else:
         keyboard = [
             [InlineKeyboardButton("📊 PnL", callback_data='pnl'),
-             InlineKeyboardButton("📈 Status", callback_data='status')],
+             InlineKeyboardButton("🔍 Status", callback_data='status')],
             [InlineKeyboardButton("📜 History", callback_data='history'),
-             InlineKeyboardButton("👯 Referrals", callback_data='referrals')],
-            [InlineKeyboardButton("📧 Support", callback_data='support')]
+             InlineKeyboardButton("👥 Referrals", callback_data='referrals')],
+            [InlineKeyboardButton("📞 Support", callback_data='support')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         expiry_days = (datetime.fromisoformat(sub_expiry) - datetime.now(TIMEZONE)).days if sub_expiry else 0
         dashboard_msg = (
-            f"🌙 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
-            f"🐾 *VIP Dashboard*\n"
-            f"🌟 Tier: {tier.capitalize()} | Expires in: {expiry_days} days\n"
-            f"💰 Trade Size: {trade_size} USDT @ 5x Leverage\n"
-            f"🔑 API: {'Set' if api_key else 'Not Set'} (Update: /setapi)\n"
+            f"🐶 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
+            f"🌟 *VIP Dashboard*\n"
+            f"🔹 *Tier*: {tier.capitalize()} | *Expires in*: {expiry_days} days\n"
+            f"💸 *Trade Size*: {trade_size} USDT @ 5x Leverage\n"
+            f"🔑 *API*: {'Set' if api_key else 'Not Set'} (Update: /setapi)\n"
             f"{trade_msg}"
-            f"💰 PnL: {total_pnl:.2f} USDT\n"
-            f"👯 *Refer & Earn*: Invite friends with this link: [{referral_link}]({referral_link})\n"
+            f"💰 *PnL*: {total_pnl:.2f} USDT\n"
+            f"👥 *Refer & Earn*: Invite friends with this link: {referral_link}\n"
             f"   - Earn 1% of their profits monthly! Check /referrals\n\n"
-            f"💡 Manage your trades below!"
+            f"🔧 *Manage your trades below!*"
         )
         await update.message.reply_text(dashboard_msg, reply_markup=reply_markup, parse_mode='Markdown')
         await pin_latest_trade(chat_id)
@@ -294,7 +295,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat_id = str(query.message.chat_id)
-    
     if query.data == 'pnl':
         await pnl(update, context)
     elif query.data == 'freetrial':
@@ -316,28 +316,24 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id) if update.callback_query else str(update.message.chat_id)
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    
     c.execute("""
-        SELECT COUNT(*) 
-        FROM referrals r 
-        JOIN users u ON r.referee_id = u.chat_id 
-        WHERE r.referrer_id = ? AND u.tier IN ('standard', 'elite')
+    SELECT COUNT(*) 
+    FROM referrals r 
+    JOIN users u ON r.referee_id = u.chat_id 
+    WHERE r.referrer_id = ? AND u.tier IN ('standard', 'elite')
     """, (chat_id,))
     valid_refs = c.fetchone()[0]
-    
     c.execute("SELECT SUM(profit) FROM referral_profits WHERE referrer_id = ?", (chat_id,))
     total_profit = c.fetchone()[0] or 0.0
-    
     conn.close()
-    
-    keyboard = [[InlineKeyboardButton("🏠 Back to Dashboard", callback_data='start')]]
+    keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data='start')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     referral_msg = (
-        f"👯 *Your Referral Stats*\n\n"
-        f"  Valid Invitees: {valid_refs} (Subscribed VIPs)\n"
-        f"  Total Earnings: {total_profit:.2f} USDT\n\n"
-        f"💡 Invite more with your link: https://t.me/GoodBoyTraderBot?start={generate_referral_code(chat_id)}\n"
-        f"💰 Earn 1% of their profits monthly when they subscribe!"
+        f"👥 *Your Referral Stats*\n\n"
+        f"✅ *Valid Invitees*: {valid_refs} (Subscribed VIPs)\n"
+        f"💰 *Total Earnings*: {total_profit:.2f} USDT\n\n"
+        f"📎 Invite more with your link: https://t.me/GoodBoyTraderBot?start={generate_referral_code(chat_id)}\n"
+        f"💸 Earn 1% of their profits monthly when they subscribe!"
     )
     await (update.callback_query.message.reply_text if update.callback_query else update.message.reply_text)(
         referral_msg, reply_markup=reply_markup, parse_mode='Markdown'
@@ -347,14 +343,14 @@ async def pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id) if update.callback_query else str(update.message.chat_id)
     _, _, _, total_pnl, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     tracker = trackers.get(chat_id, TradeTracker())
-    keyboard = [[InlineKeyboardButton("🏠 Back to Dashboard", callback_data='start')]]
+    keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data='start')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await (update.callback_query.message.reply_text if update.callback_query else update.message.reply_text)(
-        f"💰 *VIP PnL Report*\n\n"
-        f"  Total PnL: {total_pnl:.2f} USDT\n"
-        f"  Wins: {tracker.wins}\n"
-        f"  Losses: {tracker.losses}\n"
-        f"  Total Trades: {tracker.trade_count}",
+        f"📊 *VIP PnL Report*\n\n"
+        f"💰 *Total PnL*: {total_pnl:.2f} USDT\n"
+        f"✅ *Wins*: {tracker.wins}\n"
+        f"❌ *Losses*: {tracker.losses}\n"
+        f"📈 *Total Trades*: {tracker.trade_count}",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -366,15 +362,15 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active = trading_active.get(chat_id, False)
     trade = trades.get(chat_id, {})
     status_msg = (
-        f"🐾 *VIP Status*\n\n"
-        f"  Tier: {tier.capitalize()}\n"
-        f"  Trade Size: {trade_size} USDT\n"
-        f"  Position: {pos if pos != 'closing' else 'Closing'}"
+        f"🔍 *VIP Status*\n\n"
+        f"🔹 *Tier*: {tier.capitalize()}\n"
+        f"💸 *Trade Size*: {trade_size} USDT\n"
+        f"📊 *Position*: {pos if pos != 'closing' else 'Closing'}"
     )
     if pos in ["long", "short"]:
         status_msg += f" at {trade['entry_price']:.2f}"
-    status_msg += f"\n  Trading: {'Active' if active else 'Stopped'}"
-    keyboard = [[InlineKeyboardButton("🏠 Back to Dashboard", callback_data='start')]]
+    status_msg += f"\n🔧 *Trading*: {'Active' if active else 'Stopped'}"
+    keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data='start')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await (update.callback_query.message.reply_text if update.callback_query else update.message.reply_text)(
         status_msg, reply_markup=reply_markup, parse_mode='Markdown'
@@ -388,11 +384,11 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trade_list = c.fetchall()
     conn.close()
     if not trade_list:
-        keyboard = [[InlineKeyboardButton("🏠 Back to Dashboard", callback_data='start')]]
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data='start')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             f"📜 *VIP Trade History*\n\n"
-            f"  No trades yet! Start trading with /setsize after upgrading.",
+            f"📉 *No trades yet!* Start trading with /setsize after upgrading.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -400,11 +396,11 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history_msg = f"📜 *VIP Trade History (Last 5)*\n\n"
     for t in trade_list:
         history_msg += (
-            f"  {t[0]} | {t[4].capitalize()}\n"
-            f"    In: {t[1]:.2f} | Out: {t[3]:.2f}\n"
-            f"    PnL: {t[5]:.2f} USDT\n\n"
+            f"🕒 {t[0]} | {t[4].capitalize()}\n"
+            f"   In: {t[1]:.2f} | Out: {t[3]:.2f}\n"
+            f"   PnL: {t[5]:.2f} USDT\n\n"
         )
-    keyboard = [[InlineKeyboardButton("🏠 Back to Dashboard", callback_data='start')]]
+    keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data='start')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(history_msg.strip(), reply_markup=reply_markup, parse_mode='Markdown')
 
@@ -440,7 +436,6 @@ class TradeTracker:
                    trade['exit_time'].isoformat(), trade['exit_price'], trade['side'], size, user_pnl))
         conn.commit()
         conn.close()
-        # track_referral_profit(chat_id, user_pnl)  # Already synchronous, no need to await
         latest_trade = {
             "time": trade['exit_time'],
             "side": trade['side'],
@@ -449,7 +444,7 @@ class TradeTracker:
             "pnl": user_pnl
         }
         await send_telegram_alert(chat_id, 
-            f"💰 *VIP Win!* {trade['exit_type']} at {trade['exit_price']:.2f}! You made {user_pnl:.2f} USDT (Cut: {pnl * profit_cut:.2f})")
+            f"🏆 *VIP Win!* {trade['exit_type']} at {trade['exit_price']:.2f}! You made {user_pnl:.2f} USDT (Cut: {pnl * profit_cut:.2f})")
         await pin_latest_trade(chat_id)
 
 def fetch_recent_data(timeframe='4H', limit='400'):
