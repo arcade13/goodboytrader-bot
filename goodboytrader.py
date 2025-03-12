@@ -8,17 +8,18 @@ import os
 import okx.MarketData as MarketData
 import okx.Trade as Trade
 import okx.Account as Account
+import okx.Funding as Funding
 import asyncio
 import telegram
 import sqlite3
 import requests
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Application, CommandHandler
 import pytz
 import threading
 import time
 import sys
 
-# Custom logging handler to ensure flush
+# Custom logging handler
 class FlushFileHandler(logging.FileHandler):
     def emit(self, record):
         super().emit(record)
@@ -39,7 +40,7 @@ logging.info(f"Python version: {sys.version}")
 # Constants
 OKX_REFERRAL_LINK = "https://www.okx.com/join/43051887"
 USDT_TRC20_ADDRESS = "TWVQnJJd8S1Kb6DXhNhsaREcMrYunUtswA"
-TELEGRAM_TOKEN = "8197397355:AAE3cOFBdAPVpwnLZtMrhQY7hEvkYXXxR38"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8197397355:AAG0wqCpgdsjzgD1x5rnsEWoZy8WBVQNJdw")  # New token, ideally from env
 TIMEZONE = pytz.timezone('Asia/Singapore')
 leverage = 5
 instId = "SOL-USDT-SWAP"
@@ -51,6 +52,12 @@ trailing_stop_factor = 1.8
 ema_short_period = 5
 ema_mid_period = 20
 ema_long_period = 100
+
+# OKX API for payment detection
+OKX_API_KEY = os.getenv("OKX_API_KEY")
+OKX_SECRET = os.getenv("OKX_SECRET_KEY")
+OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE")
+funding_api = Funding.FundingAPI(OKX_API_KEY, OKX_SECRET, OKX_PASSPHRASE, flag="0")
 
 # Global State
 position_states = {}
@@ -83,10 +90,6 @@ def verify_tron_tx(txid, amount):
     except:
         return False
 
-# Telegram Bot Setup
-updater = Updater(TELEGRAM_TOKEN, use_context=True)
-bot = telegram.Bot(token=TELEGRAM_TOKEN)
-
 # Utility Functions
 async def send_telegram_alert(chat_id, message):
     try:
@@ -109,50 +112,50 @@ def fetch_with_retries(api_call, max_attempts=3):
     return None
 
 # Telegram Handlers
-def start(update, context):
+async def start(update, context):
     chat_id = str(update.message.chat_id)
     update_user(chat_id, "free", 0)
-    update.message.reply_text(
+    await update.message.reply_text(
         "🐾 *Woof!* Welcome to GoodBoyTrader! 14-day free trial activated!  \n"
         "⏰ Day 1/14—Upgrade: /standard ($25) or /elite ($75).  \n"
         "🌟 *Soon:* Binance, Bybit support!  \n"
         "📋 Menu: /pnl, /status, /starttrading, /stoptrading, /settp, /close, /history"
     , parse_mode='Markdown')
 
-def standard(update, context):
+async def standard(update, context):
     chat_id = str(update.message.chat_id)
-    update.message.reply_text(
+    await update.message.reply_text(
         "🚀 *Standard Tier ($25/month)*: 100–500 USDT trades!  \n"
         f"💸 Send 25 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`  \n"
         "📩 Then: /verify <txid>"
     , parse_mode='Markdown')
 
-def elite(update, context):
+async def elite(update, context):
     chat_id = str(update.message.chat_id)
-    update.message.reply_text(
+    await update.message.reply_text(
         "🏆 *Elite Tier ($75/month)*: 500–5,000 USDT trades!  \n"
         f"💸 Send 75 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`  \n"
         "📩 Then: /verify <txid>"
     , parse_mode='Markdown')
 
-def verify(update, context):
+async def verify(update, context):
     chat_id = str(update.message.chat_id)
     try:
         txid = context.args[0]
         tier, _, _, _, _, _, _ = get_user(chat_id)
         if tier != "free":
-            update.message.reply_text("🐶 *Woof!* Already a VIP!")
+            await update.message.reply_text("🐶 *Woof!* Already a VIP!")
             return
         
         amount = 25 if verify_tron_tx(txid, 25) else 75 if verify_tron_tx(txid, 75) else 0
         if amount == 0:
-            update.message.reply_text("❌ *Oops!* Invalid TXID!")
+            await update.message.reply_text("❌ *Oops!* Invalid TXID!")
             return
         
         new_tier = "standard" if amount == 25 else "elite"
         expiry = datetime.now(TIMEZONE) + timedelta(days=30)
         update_user(chat_id, new_tier, 0, expiry=expiry.isoformat())
-        update.message.reply_text(
+        await update.message.reply_text(
             f"🎉 *Woof woof!* Welcome to the {new_tier.capitalize()} VIP Pack! Expires: {expiry.strftime('%Y-%m-%d')}  \n"
             "🐾 *You’re special now—here’s how to start:*  \n"
             f"1️⃣ *Join OKX:* [{OKX_REFERRAL_LINK}]({OKX_REFERRAL_LINK})  \n"
@@ -163,13 +166,13 @@ def verify(update, context):
             "💰 5x leverage auto-set! Get 15-min VIP updates soon!"
         , parse_mode='Markdown')
     except:
-        update.message.reply_text("❌ *Grr!* Use: /verify <txid>")
+        await update.message.reply_text("❌ *Grr!* Use: /verify <txid>")
 
-def setapi(update, context):
+async def setapi(update, context):
     chat_id = str(update.message.chat_id)
     tier, trade_size, _, _, _, _, _, _, _, _ = get_user(chat_id)
     if tier == "free":
-        update.message.reply_text("👀 *Woof!* Upgrade first!")
+        await update.message.reply_text("👀 *Woof!* Upgrade first!")
         return
     try:
         key, secret, passphrase = context.args
@@ -177,85 +180,85 @@ def setapi(update, context):
         account_api.set_position_mode(posMode="long_short_mode")
         account_api.set_leverage(instId=instId, lever=str(leverage), mgnMode="cross")
         update_user(chat_id, tier, trade_size, api_key=key, api_secret=secret, api_pass=passphrase)
-        update.message.reply_text(
+        await update.message.reply_text(
             f"✅ *Woof!* API set! 5x leverage locked in.  \n"
             f"🐾 VIP step: /setsize {100 if tier == 'standard' else 500}–{500 if tier == 'standard' else 5000}"
         , parse_mode='Markdown')
     except Exception as e:
-        update.message.reply_text(f"❌ *Grr!* Failed: {str(e)}. Retry: /setapi")
+        await update.message.reply_text(f"❌ *Grr!* Failed: {str(e)}. Retry: /setapi")
 
-def setsize(update, context):
+async def setsize(update, context):
     chat_id = str(update.message.chat_id)
     tier, _, _, _, _, _, _, api_key, _, _ = get_user(chat_id)
     if tier == "free":
-        update.message.reply_text("👀 *Woof!* Upgrade first!")
+        await update.message.reply_text("👀 *Woof!* Upgrade first!")
         return
     if not api_key:
-        update.message.reply_text("🐾 *Woof!* Set API first!")
+        await update.message.reply_text("🐾 *Woof!* Set API first!")
         return
     try:
         size = float(context.args[0])
         size = adjust_trade_size(tier, size)
         update_user(chat_id, tier, size)
         trackers[chat_id] = TradeTracker()
-        trading_active[chat_id] = False  # Start stopped, user must activate
-        update.message.reply_text(
+        trading_active[chat_id] = False
+        await update.message.reply_text(
             f"✅ *Woof!* Trade size set to {size} USDT!  \n"
-            "🐶 VIP trading ready—use /starttrading to begin! 15-min updates incoming!"
+            "🐶 VIP trading ready—use /starttrading to begin!"
         , parse_mode='Markdown')
     except:
-        update.message.reply_text(f"❌ *Oops!* Use: /setsize {100 if tier == 'standard' else 500}–{500 if tier == 'standard' else 5000}")
+        await update.message.reply_text(f"❌ *Oops!* Use: /setsize {100 if tier == 'standard' else 500}–{500 if tier == 'standard' else 5000}")
 
-def starttrading(update, context):
+async def starttrading(update, context):
     chat_id = str(update.message.chat_id)
     tier, trade_size, _, _, _, _, _, api_key, _, _ = get_user(chat_id)
     if tier == "free" or not api_key or trade_size == 0:
-        update.message.reply_text("🐾 *Woof!* Complete setup: /verify, /setapi, /setsize")
+        await update.message.reply_text("🐾 *Woof!* Complete setup: /verify, /setapi, /setsize")
         return
     trading_active[chat_id] = True
-    if chat_id not in threading.active_count():
+    if chat_id not in [t.name for t in threading.enumerate()]:
         threading.Thread(target=run_trading_logic, args=(chat_id,), daemon=True).start()
-    update.message.reply_text("🚀 *Woof!* Trading started! GoodBoy’s on the hunt!")
+    await update.message.reply_text("🚀 *Woof!* Trading started! GoodBoy’s on the hunt!")
 
-def stoptrading(update, context):
+async def stoptrading(update, context):
     chat_id = str(update.message.chat_id)
     if chat_id in trading_active:
         trading_active[chat_id] = False
-        update.message.reply_text("🛑 *Woof!* Trading paused. Position still open—use /close to exit.")
+        await update.message.reply_text("🛑 *Woof!* Trading paused. Position still open—use /close to exit.")
     else:
-        update.message.reply_text("🐾 *Woof!* Trading already stopped!")
+        await update.message.reply_text("🐾 *Woof!* Trading already stopped!")
 
-def settp(update, context):
+async def settp(update, context):
     chat_id = str(update.message.chat_id)
     if chat_id not in position_states:
-        update.message.reply_text("🐾 *Woof!* No active position!")
+        await update.message.reply_text("🐾 *Woof!* No active position!")
         return
     try:
         tp_price = float(context.args[0])
         custom_tps[chat_id] = tp_price
-        update.message.reply_text(f"✅ *Woof!* TP set to {tp_price:.2f} USDT!")
+        await update.message.reply_text(f"✅ *Woof!* TP set to {tp_price:.2f} USDT!")
     except:
-        update.message.reply_text("❌ *Grr!* Use: /settp <price>")
+        await update.message.reply_text("❌ *Grr!* Use: /settp <price>")
 
-def close(update, context):
+async def close(update, context):
     chat_id = str(update.message.chat_id)
     if chat_id not in position_states:
-        update.message.reply_text("🐾 *Woof!* No active position!")
+        await update.message.reply_text("🐾 *Woof!* No active position!")
         return
-    position_states[chat_id] = "closing"  # Signal to close in trading loop
-    update.message.reply_text("🏁 *Woof!* Closing position now...")
+    position_states[chat_id] = "closing"
+    await update.message.reply_text("🏁 *Woof!* Closing position now...")
 
-def pnl(update, context):
+async def pnl(update, context):
     chat_id = str(update.message.chat_id)
     _, _, _, total_pnl, _, _, _, _, _, _ = get_user(chat_id)
     tracker = trackers.get(chat_id, TradeTracker())
-    update.message.reply_text(
+    await update.message.reply_text(
         f"💰 *VIP PnL Report*  \n"
         f"📈 Total PnL: {total_pnl:.2f} USDT  \n"
         f"🎲 Wins: {tracker.wins} | Losses: {tracker.losses} | Trades: {tracker.trade_count}"
     , parse_mode='Markdown')
 
-def status(update, context):
+async def status(update, context):
     chat_id = str(update.message.chat_id)
     tier, trade_size, _, _, _, _, _, _, _, _ = get_user(chat_id)
     pos = position_states.get(chat_id, "None")
@@ -269,9 +272,9 @@ def status(update, context):
     if pos in ["long", "short"]:
         status_msg += f"at {trade['entry_price']:.2f}"
     status_msg += f"\n⏰ Trading: {'Active' if active else 'Stopped'}"
-    update.message.reply_text(status_msg, parse_mode='Markdown')
+    await update.message.reply_text(status_msg, parse_mode='Markdown')
 
-def history(update, context):
+async def history(update, context):
     chat_id = str(update.message.chat_id)
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
@@ -279,12 +282,12 @@ def history(update, context):
     trade_list = c.fetchall()
     conn.close()
     if not trade_list:
-        update.message.reply_text("📜 *Woof!* No trade history yet!")
+        await update.message.reply_text("📜 *Woof!* No trade history yet!")
         return
     history_msg = "📜 *VIP Trade History (Last 5)*\n"
     for t in trade_list:
         history_msg += f"📅 {t[0]} | {t[4].capitalize()} | In: {t[1]:.2f} | Out: {t[3]:.2f} | PnL: {t[5]:.2f} USDT\n"
-    update.message.reply_text(history_msg, parse_mode='Markdown')
+    await update.message.reply_text(history_msg, parse_mode='Markdown')
 
 # Trading Logic
 class TradeTracker:
@@ -417,7 +420,6 @@ def run_trading_logic(chat_id):
         current_price = float(market_api.get_ticker(instId=instId)['data'][0]['last'])
         signal, s4, l4, s15, l15 = check_entry(df_4h, df_15m)
         
-        # 15-Minute VIP Update
         if (datetime.now(TIMEZONE) - last_update).total_seconds() >= 900:
             trend = "Up" if df_15m['ema_5'].iloc[-1] > df_15m['ema_100'].iloc[-1] else "Down"
             status = f"In {trades[chat_id]['side'].capitalize()} at {trades[chat_id]['entry_price']:.2f}" if chat_id in position_states else "Waiting for signal"
@@ -429,7 +431,6 @@ def run_trading_logic(chat_id):
             ))
             last_update = datetime.now(TIMEZONE)
         
-        # Trade Entry
         if signal and chat_id not in position_states:
             order_id, size_sol = place_order(trade_api, signal, current_price, trade_size)
             if order_id:
@@ -439,7 +440,7 @@ def run_trading_logic(chat_id):
                 ))
                 trades[chat_id] = {'entry_time': datetime.now(TIMEZONE), 'entry_price': current_price, 'side': signal, 'size_sol': size_sol}
                 position_states[chat_id] = signal
-                entry_atrs[chat_id] = df_15m['atr']. poveri[-1]
+                entry_atrs[chat_id] = df_15m['atr'].iloc[-1]
                 
                 stop_loss = current_price * (1 - stop_loss_pct) if signal == 'long' else current_price * (1 + stop_loss_pct)
                 trailing_sl = current_price + (entry_atrs[chat_id] * trailing_stop_factor) if signal == 'long' else current_price - (entry_atrs[chat_id] * trailing_stop_factor)
@@ -471,7 +472,7 @@ def run_trading_logic(chat_id):
                             trackers[chat_id].update(trades[chat_id], chat_id)
                             del position_states[chat_id]
                     time.sleep(10)
-        time.sleep(300)  # 5-min trade checks
+        time.sleep(300)
 
 def adjust_trade_size(tier, requested_size):
     if tier == "standard":
@@ -502,21 +503,28 @@ def get_user(chat_id):
 
 # Main
 init_db()
-updater.dispatcher.add_handler(CommandHandler("start", start))
-updater.dispatcher.add_handler(CommandHandler("standard", standard))
-updater.dispatcher.add_handler(CommandHandler("elite", elite))
-updater.dispatcher.add_handler(CommandHandler("verify", verify))
-updater.dispatcher.add_handler(CommandHandler("setapi", setapi))
-updater.dispatcher.add_handler(CommandHandler("setsize", setsize))
-updater.dispatcher.add_handler(CommandHandler("starttrading", starttrading))
-updater.dispatcher.add_handler(CommandHandler("stoptrading", stoptrading))
-updater.dispatcher.add_handler(CommandHandler("settp", settp))
-updater.dispatcher.add_handler(CommandHandler("close", close))
-updater.dispatcher.add_handler(CommandHandler("pnl", pnl))
-updater.dispatcher.add_handler(CommandHandler("status", status))
-updater.dispatcher.add_handler(CommandHandler("history", history))
-updater.start_polling()
+application = Application.builder().token(TELEGRAM_TOKEN).build()
+bot = application.bot
 
+# Add handlers
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("standard", standard))
+application.add_handler(CommandHandler("elite", elite))
+application.add_handler(CommandHandler("verify", verify))
+application.add_handler(CommandHandler("setapi", setapi))
+application.add_handler(CommandHandler("setsize", setsize))
+application.add_handler(CommandHandler("starttrading", starttrading))
+application.add_handler(CommandHandler("stoptrading", stoptrading))
+application.add_handler(CommandHandler("settp", settp))
+application.add_handler(CommandHandler("close", close))
+application.add_handler(CommandHandler("pnl", pnl))
+application.add_handler(CommandHandler("status", status))
+application.add_handler(CommandHandler("history", history))
+
+# Start the bot
+application.run_polling()
+
+# Keep main thread alive
 while True:
     logging.info("Heartbeat: Bot running...")
     time.sleep(1)
