@@ -396,7 +396,7 @@ async def settp(update, context):
     chat_id = str(update.message.chat_id)
     tier, _, _, _, _, _, _, _, _, _, _, _, _, _ = get_user(chat_id)
     if tier != "elite":
-        await update.message.reply \n\nreply_text("🐾 *Woof!* Custom TP is an Elite feature! Upgrade with /elite.")
+        await update.message.reply_text("🐾 *Woof!* Custom TP is an Elite feature! Upgrade with /elite.")
         return
     if chat_id not in position_states:
         await update.message.reply_text("🐾 *Woof!* No active position!")
