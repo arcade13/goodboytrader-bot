@@ -13,6 +13,7 @@ import asyncio
 import telegram
 import sqlite3
 import requests
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler
 import pytz
 import threading
@@ -167,7 +168,7 @@ def verify_tron_tx(txid, amount):
 def update_user(chat_id, tier, trade_size, expiry=None, api_key=None, api_secret=None, api_pass=None, referral_code=None, referred_by=None, referral_reward_claimed=None, wallet=None):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    profit_cut = 0.15 if tier == "standard" else 0.10 if tier == "elite" else 0
+    profit_cut = 0.05 if tier == "standard" else 0.03 if tier == "elite" else 0  # Updated profit cuts
     signup_date = datetime.now(TIMEZONE).isoformat() if tier == "free" else get_user(chat_id)[5]
     sub_expiry = expiry or get_user(chat_id)[6]
     current = get_user(chat_id)
@@ -206,18 +207,21 @@ async def start(update, context):
         conn.close()
     
     tier, _, _, _, _, signup_date, sub_expiry, _, _, _, _, _, _, _ = get_user(chat_id)
+    referral_link = f"https://t.me/GoodBoyTraderBot?start={referral_code}"  # New referral link
     welcome_msg = (
         f"🌙 *Trade While You Sleep, Wake Up with a Smile – GoodBoyTrader’s Got You!*\n\n"
         f"🐾 Welcome to the *first sophisticated trading bot* that analyzes every move before pouncing!\n"
         f"💰 *92% Proven Success from 5-Month Backtests!*\n"
         f"🌟 Trading SOL-USDT-SWAP on OKX now – Tier-1 exchanges (Binance, Bybit) coming soon!\n"
         f"🎁 *14-Day Free Trial*: See our biggest wins!\n"
-        f"👯 *Refer & Earn*: Invite friends with `{referral_code}` – get 1% of their profits monthly when they subscribe!\n\n"
+        f"👯 *Refer & Earn*: Invite friends with this link: [{referral_link}]({referral_link})\n"
+        f"   - Earn 1% of their profits monthly when they subscribe!\n\n"
         f"🚀 *Choose Your Tier:*\n"
-        f"  📍 *Standard ($40/mo)*: 100–500 USDT trades, basic auto-trading, core signals, no custom TP, 15% profit cut.\n"
-        f"  🏆 *Elite ($75/mo)*: 500–5,000 USDT trades, custom TP (/settp), detailed signal updates, *10% profit cut*, priority support.\n\n"
+        f"  📍 *Standard ($40/mo)*: 100–500 USDT trades, basic auto-trading, core signals, no custom TP, 5% profit cut.\n"
+        f"  🏆 *Elite ($75/mo)*: 500–5,000 USDT trades, custom TP (/settp), detailed signal updates, *3% profit cut*, priority support.\n\n"
         f"💡 Start with: /freetrial | /standard | /elite\n"
-        f"📋 Check it out: /pnl, /status, /history"
+        f"📋 Check it out: /pnl, /status, /history\n"
+        f"📧 Need help? Use /support"
     )
     if tier == "trial_expired" or (tier == "free" and sub_expiry and datetime.now(TIMEZONE) > datetime.fromisoformat(sub_expiry)):
         update_user(chat_id, "free", 0, expiry=(datetime.now(TIMEZONE) + timedelta(days=14)).isoformat(), referral_code=referral_code, referred_by=referred_by)
@@ -265,7 +269,7 @@ async def standard(update, context):
         f"  - Commands: /pnl, /status, /history, /stoptrading, /close, /setsize\n"
         f"  - Predefined stop-loss & trailing stops (no custom TP)\n"
         f"  - Basic 15-min updates (price & trend only)\n"
-        f"  - 15% profit cut\n\n"
+        f"  - 5% profit cut\n\n"
         f"💸 Send 40 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`\n"
         f"📩 Then: /verify <txid>\n\n"
         f"🐾 Affordable entry for casual traders—want more control? See /elite!"
@@ -280,7 +284,7 @@ async def elite(update, context):
         f"  - All Standard features, *plus:*\n"
         f"  - Custom take-profit with /settp\n"
         f"  - Enhanced 15-min updates with signal points (e.g., 4H Short: X/4)\n"
-        f"  - *Higher profit retention: 10% cut* (vs. 15% Standard)\n"
+        f"  - *Higher profit retention: 3% cut* (vs. 5% Standard)\n"
         f"  - Priority support & future premium features (e.g., Binance/Bybit pairs)\n\n"
         f"💸 Send 75 USDT (TRC-20) to: `{USDT_TRC20_ADDRESS}`\n"
         f"📩 Then: /verify <txid>\n\n"
@@ -459,6 +463,19 @@ async def setwallet(update, context):
     except:
         await update.message.reply_text("❌ *Grr!* Use: /setwallet <USDT_TRC20_address>")
 
+async def support(update, context):
+    chat_id = str(update.message.chat_id)
+    keyboard = [
+        [InlineKeyboardButton("📧 Contact Support", url="mailto:gbtradersupport@yahoo.com")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        f"🐾 *Need Help?*\n\n"
+        f"Click below to email our support team at gbtradersupport@yahoo.com!",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
 # Trading Logic
 class TradeTracker:
     def __init__(self):
@@ -599,7 +616,7 @@ def run_trading_logic(chat_id):
                 f"🐾 Status: {status}"
             )
             if tier == "elite":
-                update_msg += f"\Musn📊 Points - 4H Short: {s4}/4 | Long: {l4}/4 | 15m Short: {s15}/3 | Long: {l15}/3"
+                update_msg += f"\n📊 Points - 4H Short: {s4}/4 | Long: {l4}/4 | 15m Short: {s15}/3 | Long: {l15}/3"
             asyncio.run(send_telegram_alert(chat_id, update_msg))
             last_update = datetime.now(TIMEZONE)
         
@@ -679,6 +696,7 @@ application.add_handler(CommandHandler("pnl", pnl))
 application.add_handler(CommandHandler("status", status))
 application.add_handler(CommandHandler("history", history))
 application.add_handler(CommandHandler("setwallet", setwallet))
+application.add_handler(CommandHandler("support", support))  # New support handler
 
 # Start payout thread
 threading.Thread(target=lambda: asyncio.run(monthly_payout()), daemon=True).start()
