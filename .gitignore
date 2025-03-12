@@ -5,3 +5,6 @@ goodboytrader.log
 okx_trading_bot.log # Matches your script’s log file
 goodboytrader.log
 okx_trading_bot.log
+goodboytrader.log
+okx_trading_bot.log
+users.db # SQLite DB shouldn’t be tracked
